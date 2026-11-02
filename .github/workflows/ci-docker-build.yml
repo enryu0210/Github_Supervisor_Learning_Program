@@ -1,0 +1,20 @@
+name: ci-docker-build
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: 환경변수 예시 파일 복사
+        run: cp .env.example .env
+      - name: Compose 파일 검증
+        run: docker compose config -q
+      - name: 이미지 빌드
+        run: docker compose build
