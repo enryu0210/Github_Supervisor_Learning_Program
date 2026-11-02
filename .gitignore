@@ -1,0 +1,14 @@
+# 시크릿: 예시 파일만 레포에 올린다.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
