@@ -279,7 +279,10 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | `guide_stopped` | 가이드를 중간에 그만둠 |
 | `detected` | watcher가 GitHub에서 발견 |
 
-- `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. 나머지는 null.
+- `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null.
+- `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다.
+- `guide skip`은 별도 action을 만들지 않고 `guide_stopped`로 기록한다.
+- `blocked`는 R03(실행 불가 규칙) 취소에만 쓴다. 다른 규칙에서 Ctrl+C 등으로 중단하는 경우는 이벤트를 남기지 않는다.
 - 다중 위반이면 위반마다 이벤트 1건씩 남긴다(같은 `command_summary`).
 - `source`는 `cli` 또는 `github`. 두 경우 모두 같은 스키마.
 - v1은 11/5 확정 후 임지윤·이남주에게 통보했다. 이후 필드 추가·변경은 PR을 올리고 CLI·웹·DB 담당 3명이 모두 승인한다. ERD의 `events.action` 설명도 함께 바꾼다.
