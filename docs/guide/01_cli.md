@@ -166,6 +166,8 @@ git-coach/
 ```
 `rules/`·`guide/`·`explain/`·`events.py`·`models.py`는 watcher가 재사용하는 공용 부분이라 CLI 전용 코드(`cli.py`·`shim.py`·`ui.py`)를 import하지 않는다.
 
+`context.py`의 보호 브랜치 값은 `config.py`(3-8의 10번 PR)가 생기기 전까지는 `["main"]`을 하드코딩해서 돌려주고, `cli-config` PR에서 실제 설정 파일을 읽도록 교체한다(앞 PR이 뒤 PR을 기다리지 않게 하기 위함).
+
 **모듈 간 약속 (인터페이스)** — 각 모듈이 다른 모듈에 제공하는 함수와 입출력. 이것만 지키면 따로 만들어도 맞물린다. 바꾸려면 PR에서 논의한다.
 
 | 모듈 | 핵심 함수 | 돌려주는 것 |
@@ -214,15 +216,17 @@ git-coach/
 ### 3-8. PR 쪼개기 (1 PR = 1 목적, ~300줄, base는 upstream develop)
 1. `feature/cli-project-skeleton` — 골격, pyproject, ci-lint·ci-test
 2. `feature/cli-git-shim` — 가로채기, 터미널 판단, 통과 로직
-3. `feature/cli-git-parser` — 인자 파서 + context
+3. `feature/cli-git-parser` — 인자 파서 + context (보호 브랜치는 `["main"]` 하드코딩, 10번에서 config로 교체)
 4. `feature/cli-choice-prompt` — 2선택지 화면(다중 위반 목록), "그냥 실행하면" 문구
 5. `feature/cli-rule-protected-push`(R01), `feature/cli-rule-force-push`(R02), `feature/cli-rule-secret-commit`(R03)
 6. `feature/cli-guide-engine` — 가이드 상태·매칭·명령어·다중 위반 큐
-7. `feature/cli-event-log` — 스키마 v1 + SQLite (임지윤·이남주 리뷰)
+7. `feature/cli-event-log` — 스키마 v1 + SQLite + `gitcoach log [--today]` 조회 커맨드 (임지윤·이남주 리뷰)
 8. `feature/cli-explain-ollama` — LLM 설명, 템플릿 폴백, 캐시
 9. `feature/cli-rule-direct-commit`(R04), `feature/cli-rule-naming`(R05·R06)
-10. (P2) `feature/cli-irreversible-confirm`(추가 확인), `feature/cli-severity-context`(상황별 심각도)
-11. (v0.2) `feature/cli-rule-destructive`(R07)
+10. `feature/cli-config` — `config.py`(설정 병합, 보호 브랜치) + `gitcoach config` 커맨드. `context.py`가 하드코딩 대신 이 모듈을 읽도록 교체
+11. `feature/cli-init-doctor` — `gitcoach init`(쉘 래퍼 설치·Ollama 연결 확인·설정 파일 생성, member 자동 감지) + `gitcoach uninstall`(래퍼 제거) + `gitcoach doctor`(상태 점검)
+12. (P2) `feature/cli-irreversible-confirm`(추가 확인), `feature/cli-severity-context`(상황별 심각도)
+13. (v0.2) `feature/cli-rule-destructive`(R07)
 
 ## 4. 결정 사항 (11/5)
 - [x] 스키마 v1의 `action` 값 → 6장의 6개 값으로 확정. 임지윤·이남주에게 변경 통보
