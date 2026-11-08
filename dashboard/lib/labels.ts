@@ -30,7 +30,7 @@ export const ACTION_LABELS: Record<EventAction, LabelInfo> = {
   },
   blocked: {
     label: "실행 막힘",
-    description: "비밀 정보 커밋 등으로 실행이 막혔거나 취소했어요.",
+    description: "비밀 정보가 들어 있어 실행을 막았어요.",
     tone: "danger",
   },
   guide_completed: {

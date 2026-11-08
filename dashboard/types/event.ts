@@ -15,7 +15,7 @@ export type EventSource = (typeof EVENT_SOURCES)[number];
  * 위험 명령을 잡았을 때 남는 결과.
  * - allowed          : 경고를 보고도 [1] 그냥 실행함
  * - guided           : [2] 가이드를 선택함 (원래 명령은 취소됨)
- * - blocked          : 실행이 막힘 (R03 비밀 정보, 또는 [q] 취소)
+ * - blocked          : R03(비밀 정보) 전용 차단. R03 화면의 [q] 취소도 blocked 로 기록
  * - guide_completed  : 가이드를 끝까지 함 (related_event_id → 원래 guided 이벤트)
  * - guide_stopped    : 가이드를 중간에 그만둠 (related_event_id → 원래 guided 이벤트)
  * - detected         : watcher가 GitHub에서 발견함 (source = "github")
@@ -54,17 +54,26 @@ export type GitCoachEvent = {
   rule_id: RuleId;
   severity: Severity;
   action: EventAction;
-  command_summary: string; // 예: "git push origin main"
+  command_summary: string | null; // 예: "git push origin main". 시크릿 값은 넣지 않는다
   branch: string | null;
   pr_number: number | null;
-  explanation: string;
+  explanation: string | null; // allowed 면 항상 null (ERD의 DB 제약)
   llm_used: boolean;
-  /** 가이드 완료·중단 이벤트가 원래 guided 이벤트의 id를 가리킨다. 그 외에는 null. */
+  /**
+   * 연결된 원래 이벤트의 id.
+   * - guide_completed·guide_stopped → 원래 guided 이벤트 (필수)
+   * - guided(복구, `gitcoach guide undo`) → 원래 allowed 이벤트
+   * - 그 외 → null
+   */
   related_event_id: string | null;
 };
 
-/** 타입 가드: 위반 발생 이벤트인가 */
+/**
+ * 타입 가드: 위반 발생 이벤트인가
+ * 복구 가이드(guided + related_event_id → 원래 allowed)는 이미 센 위반의 후속 기록이므로 제외한다.
+ */
 export function isViolation(e: GitCoachEvent): boolean {
+  if (e.action === "guided" && e.related_event_id !== null) return false;
   return (VIOLATION_ACTIONS as readonly EventAction[]).includes(e.action);
 }
 
