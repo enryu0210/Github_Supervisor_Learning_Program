@@ -41,6 +41,7 @@ erDiagram
         uuid id PK
         uuid repo_id FK
         int number
+        text title
         text author "github_login"
         text state
         timestamptz opened_at
@@ -82,7 +83,7 @@ erDiagram
         uuid quiz_id FK
         uuid member_id FK
         int selected_index
-        boolean correct
+        boolean is_correct
         timestamptz attempted_at
     }
 ```
@@ -138,6 +139,7 @@ erDiagram
 | id | uuid | PK | |
 | repo_id | uuid | FK → repos | |
 | number | int | | `(repo_id, number)` UK |
+| title | text | | PR 제목 (방치 PR 목록 표시용) |
 | author | text | | github_login |
 | state | text | | 값 목록은 watcher와 확정 예정 |
 | opened_at | timestamptz | | |
@@ -185,7 +187,7 @@ erDiagram
 | quiz_id | uuid | FK → quizzes | |
 | member_id | uuid | FK → members | |
 | selected_index | int | | 0 이상 |
-| correct | boolean | | |
+| is_correct | boolean | | |
 | attempted_at | timestamptz | | default now() |
 
 > 퀴즈 저장 경로(Edge Function 구성 등)는 11/24 퀴즈 작업 때 다시 맞춘다.
@@ -263,6 +265,9 @@ erDiagram
 | `v_guide_completion` | 규칙·멤버별 `guided` 대비 `guide_completed`·`guide_stopped` 비율 |
 
 반환 컬럼은 웹 `lib/data/` 타입(11/16 전후)에 맞춰 정한다.
+
+- `quizzes`·`quiz_attempts`의 `member_id`는 뷰에서 `members`와 조인해 `github_login`을 `member` 컬럼으로 내보낸다.
+- `v_stale_prs`의 `url`은 저장하지 않고 뷰에서 `'https://github.com/' || repos.full_name || '/pull/' || prs.number`로 만든다.
 
 ## 변경 이력
 
