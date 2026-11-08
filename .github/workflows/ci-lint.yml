@@ -1,0 +1,20 @@
+name: ci-lint
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+# 웹(ESLint·Prettier) 잡은 dashboard 코드와 린트 명령이 올라올 때 추가한다.
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - run: pip install ruff
+      - run: ruff check .
