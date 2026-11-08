@@ -1,4 +1,17 @@
+# PR #3(CLI 골격)의 .gitignore 를 기준으로, 인프라 쪽 항목을 합쳤다.
 .venv/
 __pycache__/
 *.egg-info/
+
+# 시크릿: 예시 파일만 레포에 올린다.
 .env
+.env.*
+!.env.example
+
+# Python 도구 캐시
+.ruff_cache/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/

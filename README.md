@@ -42,6 +42,17 @@ Git에 익숙하지 않은 사람은 다음과 같은 실수를 자주 합니다
 | 대시보드 배포 | Vercel |
 | 실행 환경 | Docker Compose (컨테이너 3종 이상, 구현하며 확정) |
 
+## 로컬 실행
+
+지금은 `watcher`와 `dashboard`가 빈 컨테이너이며, 기능이 생기는 대로 채웁니다.
+
+```bash
+cp .env.example .env                                # 실제 키 값은 .env에만 적습니다
+docker compose up -d --build
+docker compose ps                                   # 서비스 3개가 떠 있는지 확인
+docker compose exec ollama ollama pull gemma4:e2b   # 최초 1회, 모델은 볼륨에 저장됩니다
+```
+
 ## 팀 구성 및 역할
 
 | 분야 | 이름 | 담당 |
