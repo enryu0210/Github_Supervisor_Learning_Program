@@ -107,6 +107,7 @@ $ git switch -c feature/cli-login-fix
 5. 그 외 명령은 평소처럼 규칙 검사를 거치고 "가이드 진행 중: 다음은 …" 힌트를 붙인다.
 6. git 밖의 단계(`gh pr create`, `.gitignore` 편집)는 래퍼가 볼 수 없으므로 `gitcoach guide done`으로 직접 완료 표시한다.
 7. 가이드 하나가 끝나면 요약(배운 점 1줄)을 보여 주고 `guide_completed`를 남긴다. 큐에 다음 가이드가 있으면 이어서 시작한다. 퀴즈(핵심 기능 3)의 출제 근거가 된다.
+8. `guide skip`·`guide stop`으로 중간에 그만두면 `guide_completed` 대신 `guide_stopped`를 남긴다. `skip`도 별도 action 값 없이 `guide_stopped`로 기록한다(스키마 값은 6개로 유지).
 
 명령어: `gitcoach guide`(현재 단계 다시 보기) · `guide hint`(1회: 힌트, 2회: 정답 명령) · `guide done` · `guide skip` · `guide stop`
 
@@ -159,7 +160,7 @@ git-coach/
 │  ├─ guide/               # scenarios.py(규칙별 단계), matcher.py(입력↔기대 단계), state.py(진행·큐 저장)
 │  ├─ explain/             # ollama.py, prompts.py, templates.py(폴백), cache.py
 │  ├─ events.py            # 이벤트 스키마 v1, 로컬 SQLite 저장
-│  └─ config.py            # ~/.gitcoach/config.toml + .gitcoach.toml 병합
+│  └─ config.py            # ~/.gitcoach/config.toml(member=github_login 등) + .gitcoach.toml 병합
 ├─ tests/                  # 규칙별 단위 테스트, tmp_path 임시 레포 통합 테스트
 └─ samples/                # 샘플 이벤트 JSON (11/9 20건+)
 ```
@@ -201,7 +202,7 @@ git-coach/
 ### 3-7. 명령어
 | 명령 | 하는 일 |
 |---|---|
-| `gitcoach init` | 쉘 래퍼 설치, Ollama 연결과 모델 확인, 설정 파일 생성 |
+| `gitcoach init` | 쉘 래퍼 설치, Ollama 연결과 모델 확인, 설정 파일 생성(`gh api user`로 member=github_login 자동 감지 후 소문자로 저장, 실패 시 수동 입력) |
 | `gitcoach doctor` | Ollama·모델·git·래퍼 상태 점검, 문제 시 해결 방법 안내 |
 | `gitcoach config` | 보호 브랜치, 규칙 끄기, Ollama 주소·모델 변경 |
 | `gitcoach log [--today]` | 내 위반·선택 기록 보기 |
