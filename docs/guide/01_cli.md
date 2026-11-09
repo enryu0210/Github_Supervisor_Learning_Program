@@ -357,7 +357,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 
 ## 부록. 팀 공통 (요약)
 - 도구: Ollama(gemma4:e2b), Supabase, Vercel, Docker Compose(컨테이너 3종+), GitHub Actions(워크플로 5개+)
-- 브랜치: `main`(배포, `release`에서만 병합, 병합 시 태그) / `develop`(통합, 승인 1명+) / `feature/<영역>-<설명>` / `fix/<영역>-<설명>` / `release/vX.Y`(마일스톤 완료 시 팀장이 `develop`에서 분기 → 버전 문서화·테스트 → `main` 병합). hotfix는 사용하지 않음(11/5 결정 — 실제 배포 없이 개발 과정만 다루는 프로젝트라 긴급 운영 수정 시나리오가 없음)
+- 브랜치: `main`(배포, `release`에서만 병합, 병합 시 태그) / `develop`(통합, 승인 1명+) / `feature/<영역>-<설명>` / `fix/<영역>-<설명>` / `docs/<설명>`(문서 전용 작업, 11/9 피드백 반영) / `release/vX.Y`(마일스톤 완료 시 팀장이 `develop`에서 분기 → 버전 문서화·테스트 → `main` 병합). hotfix는 사용하지 않음(11/5 결정 — 실제 배포 없이 개발 과정만 다루는 프로젝트라 긴급 운영 수정 시나리오가 없음)
 - 커밋·PR 세부 규칙은 `CLAUDE.md`를 따른다.
 - 오픈소스 표기: Ollama·Supabase는 오픈소스, Vercel은 호스팅 서비스로 별도 표기
 
