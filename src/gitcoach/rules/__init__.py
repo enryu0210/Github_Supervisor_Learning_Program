@@ -3,12 +3,14 @@ from collections.abc import Callable
 from gitcoach.models import Command, Context, Violation
 from gitcoach.rules.r01_protected_push import check_protected_push
 from gitcoach.rules.r02_force_push import check_force_push
+from gitcoach.rules.r03_secret_commit import check_secret_commit
 
 _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 _RULES: list[Callable[[Command, Context], Violation | None]] = [
     check_protected_push,
     check_force_push,
+    check_secret_commit,
 ]
 
 
