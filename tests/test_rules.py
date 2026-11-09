@@ -12,7 +12,8 @@ def _ctx() -> Context:
     )
 
 
-def test_evaluate_empty_when_no_rules_registered() -> None:
+def test_evaluate_empty_when_no_rules_match(monkeypatch) -> None:
+    monkeypatch.setattr(rules, "_RULES", [])
     cmd = Command(subcommand="push", flags=[], positionals=[])
     assert rules.evaluate(cmd, _ctx()) == []
 
