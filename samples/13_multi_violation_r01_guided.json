@@ -1,0 +1,17 @@
+{
+  "id": "4f4b8020-4e0e-4b21-b760-3100659ce431",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T10:11:00+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "hoil-lim",
+  "rule_id": "R01",
+  "severity": "high",
+  "action": "guided",
+  "command_summary": "git push --force origin main",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": "main은 팀 전체가 공유하는 배포 브랜치예요. 리뷰·CI 없이 들어가면 배포까지 영향을 줄 수 있어요. 가장 심각한 이 규칙부터 먼저 가이드할게요.",
+  "llm_used": true,
+  "related_event_id": null
+}

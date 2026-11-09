@@ -1,0 +1,17 @@
+{
+  "id": "0d2ddc48-9318-4720-af35-78d86379482b",
+  "schema_version": 1,
+  "occurred_at": "2026-11-06T09:12:03+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "jiyoon-lim",
+  "rule_id": "R01",
+  "severity": "high",
+  "action": "allowed",
+  "command_summary": "git push origin main",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": null,
+  "llm_used": false,
+  "related_event_id": null
+}

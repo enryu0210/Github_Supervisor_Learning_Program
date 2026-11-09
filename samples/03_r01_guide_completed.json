@@ -1,0 +1,17 @@
+{
+  "id": "4756ffc3-cf9b-45d6-a6da-434a5d378485",
+  "schema_version": 1,
+  "occurred_at": "2026-11-06T10:37:47+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "hoil-lim",
+  "rule_id": "R01",
+  "severity": "high",
+  "action": "guide_completed",
+  "command_summary": "git push origin main",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": "feature 브랜치로 옮겨 PR까지 올리는 가이드를 끝까지 완료함",
+  "llm_used": false,
+  "related_event_id": "a7647fdc-1f92-4303-9975-75c9f8a758b3"
+}

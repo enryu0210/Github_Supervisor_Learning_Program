@@ -1,0 +1,17 @@
+{
+  "id": "3c61c35c-e54e-41a6-ba0a-e1b24db3e6fc",
+  "schema_version": 1,
+  "occurred_at": "2026-11-06T13:05:22+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "ahyeon-kwon",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "allowed",
+  "command_summary": "git push --force origin feature/watcher-poll",
+  "branch": "feature/watcher-poll",
+  "pr_number": null,
+  "explanation": null,
+  "llm_used": false,
+  "related_event_id": null
+}

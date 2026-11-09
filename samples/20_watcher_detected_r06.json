@@ -1,0 +1,17 @@
+{
+  "id": "2d75e01c-c3eb-48af-8534-57eb8c55b438",
+  "schema_version": 1,
+  "occurred_at": "2026-11-11T09:05:00+09:00",
+  "source": "github",
+  "repo": "gitcoach-team/git-coach",
+  "member": "namju-lee",
+  "rule_id": "R06",
+  "severity": "low",
+  "action": "detected",
+  "command_summary": null,
+  "branch": "feature/db-schema-update",
+  "pr_number": 42,
+  "explanation": "PR #42의 커밋 목록 조회 결과 커밋 메시지 규칙 위반 발견",
+  "llm_used": false,
+  "related_event_id": null
+}
