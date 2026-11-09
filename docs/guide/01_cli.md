@@ -108,7 +108,8 @@ $ git switch -c feature/cli-login-fix
 5. 그 외 명령은 평소처럼 규칙 검사를 거치고 "가이드 진행 중: 다음은 …" 힌트를 붙인다.
 6. git 밖의 단계(`gh pr create`, `.gitignore` 편집)는 래퍼가 볼 수 없으므로 `gitcoach guide done`으로 직접 완료 표시한다.
 7. 가이드 하나가 끝나면 요약(배운 점 1줄)을 보여 주고 `guide_completed`를 남긴다. 큐에 다음 가이드가 있으면 이어서 시작한다. 퀴즈(핵심 기능 3)의 출제 근거가 된다.
-8. `guide skip`·`guide stop`으로 중간에 그만두면 `guide_completed` 대신 `guide_stopped`를 남긴다. `skip`도 별도 action 값 없이 `guide_stopped`로 기록한다(스키마 값은 6개로 유지).
+8. `guide skip`은 **현재 가이드만** 중단한다 — `guide_completed` 대신 `guide_stopped`를 남기고, 큐에 남은 가이드가 있으면 바로 이어서 시작한다(7번과 동일하게 자동 진행). `guide stop`은 **큐 전체**를 중단한다 — 현재 가이드에 `guide_stopped`를 남기고 남은 큐는 비운 채 종료한다(11/9 확정). 둘 다 별도 action 값 없이 `guide_stopped`로 기록한다(스키마 값은 6개로 유지).
+9. 가이드 진행 중 **무관한 명령**에서 새 위반이 뜨고 학생이 다시 [2]를 고르면, 진행 중이던 가이드·큐는 버리고 새 위반의 가이드로 **덮어쓴다**(11/9 확정, 최소 구현 — 기존 가이드를 보존·재개하는 것은 범위 밖).
 
 명령어: `gitcoach guide`(현재 단계 다시 보기) · `guide hint`(1회: 힌트, 2회: 정답 명령) · `guide done` · `guide skip` · `guide stop`
 
@@ -139,7 +140,7 @@ $ git switch -c feature/cli-login-fix
 
 반영 계획:
 1. 선택 화면에 "그냥 실행하면:" 한 줄 — v0.1
-2. [1] 실행 직후 "되돌리려면" 안내, `gitcoach guide undo`로 복구 가이드 — v0.1
+2. [1] 실행 직후 "되돌리려면" 안내, `gitcoach guide undo`로 복구 가이드 — v0.1 (`guide undo`는 원래 `allowed` 이벤트를 참조해야 해서 `cli-event-log`(3-8의 7번) 이후 별도 PR로 진행, 11/9 확정)
 3. 되돌릴 수 없는 명령(`clean -fd`, 미커밋 변경이 있는 `reset --hard`)은 [1]이어도 y/N 한 번 더 — **P2** (R07과 함께 v0.2가 될 가능성 높음)
 4. 상황별 심각도 조절(혼자 쓰는 feature 브랜치의 force push는 낮춤) — **P2** (시간이 남으면)
 5. 반복 허용한 규칙을 퀴즈에 우선 출제 — v0.1에서는 이벤트만 남기고 11/24~ 퀴즈 때 사용
@@ -210,7 +211,8 @@ git-coach/
 | `gitcoach config` | 보호 브랜치, 규칙 끄기, Ollama 주소·모델 변경 |
 | `gitcoach log [--today]` | 내 위반·선택 기록 보기 |
 | `gitcoach explain <R01>` | 규칙 설명 미리 보기(학습용) |
-| `gitcoach guide [hint\|done\|skip\|stop\|undo]` | 학습 가이드 진행 |
+| `gitcoach guide [hint\|done\|skip\|stop]` | 학습 가이드 진행 (`cli-guide-engine`, R01~R03 시나리오) |
+| `gitcoach guide undo` | 되돌리기 복구 가이드. 원래 `allowed` 이벤트 참조가 필요해 `cli-event-log`(7번) 이후 별도 PR로 추가(11/9 확정) |
 | `gitcoach sync` | 팀 토큰으로 Supabase Edge Function `ingest-events`를 호출해 로그를 올린다(CLI는 DB에 직접 쓰지 않음). **v0.1에서는 stub만**. 퀴즈는 포함하지 않음(퀴즈는 watcher 담당, 11/9 확정) |
 | `gitcoach uninstall` | 래퍼 제거 |
 
@@ -227,10 +229,10 @@ git-coach/
 3. `feature/cli-git-parser` — 인자 파서 + context (보호 브랜치는 `["main"]` 하드코딩, 10번에서 config로 교체)
 4. `feature/cli-choice-prompt` — 2선택지 화면(다중 위반 목록), "그냥 실행하면" 문구
 5. `feature/cli-rule-protected-push`(R01), `feature/cli-rule-force-push`(R02), `feature/cli-rule-secret-commit`(R03)
-6. `feature/cli-guide-engine` — 가이드 상태·매칭·명령어·다중 위반 큐
+6. `feature/cli-guide-engine` — 가이드 상태·매칭·명령어(`hint`·`done`·`skip`·`stop`)·다중 위반 큐. **R01~R03 시나리오만** 포함(R04~06은 9번에서 해당 규칙과 함께 추가), `guide undo`는 7번 이후로 미룸(11/9 확정)
 7. `feature/cli-event-log` — 스키마 v1 + SQLite + `gitcoach log [--today]` 조회 커맨드 (임지윤·이남주 리뷰)
 8. `feature/cli-explain-ollama` — LLM 설명, 템플릿 폴백, 캐시
-9. `feature/cli-rule-direct-commit`(R04), `feature/cli-rule-naming`(R05·R06)
+9. `feature/cli-rule-direct-commit`(R04), `feature/cli-rule-naming`(R05·R06) — 규칙 로직과 함께 각 가이드 시나리오(3-3 표)도 이 PR에서 추가(11/9 확정)
 10. `feature/cli-config` — `config.py`(설정 병합, 보호 브랜치) + `gitcoach config` 커맨드. `context.py`가 하드코딩 대신 이 모듈을 읽도록 교체
 11. `feature/cli-sync` — 팀 토큰(`config.py`) + Edge Function `ingest-events` 호출로 `gitcoach sync` 실구현(stub 교체). 팀 토큰은 `~/.gitcoach/config.toml`에 평문 저장(11/9 확정, 홈 디렉터리라 레포 커밋 대상 아님, 화면·로그에 값 노출 금지)
 12. `feature/cli-init-doctor` — `gitcoach init`(쉘 래퍼 설치·Ollama 연결 확인·설정 파일 생성, member 자동 감지) + `gitcoach uninstall`(래퍼 제거) + `gitcoach doctor`(상태 점검)
