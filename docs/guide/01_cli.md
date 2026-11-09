@@ -245,10 +245,13 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 브랜치명 규칙 위반 | 브랜치 목록 조회 후 R05 재사용 | 공용 규칙 엔진 |
 | PR 대상 브랜치 오류(feature → main) | 열린 PR의 base 확인 | feature는 develop으로 |
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
-| 방치된 PR | 마지막 활동 후 N일 이상 열린 PR(N은 팀이 정함) | `prs.last_activity_at` |
+| 방치된 PR | 마지막 활동 후 **3일**(11/9 임시 결정, N 확정 전까지 watcher·대시보드·DB 뷰 공통 사용) 이상 열린 PR | `prs.last_activity_at` |
 | 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함 |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
+- PR 데이터 수집 시 `author`·`reviewers`는 GitHub API 값을 그대로 쓰지 않고 `lower()` 처리 후 저장한다(DB `members.github_login` 소문자 제약과 매칭, 11/9 결정).
+- PR `state`는 GitHub API 값 `open`·`closed`만 받는다. "merged" 여부는 `merged_at` 존재로 판별한다(GitHub API에 `state=merged`는 없음, 11/9 확인).
+- PR `title`은 항상 존재하는 값으로 보고 필수로 수집한다(방치 PR 목록 표시용, `prs.title` not null).
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`.
 - 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만.
@@ -285,10 +288,11 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | `detected` | watcher가 GitHub에서 발견 |
 
 - `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null.
-- `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다.
+- `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다. **구현 시 주의**: 이 값은 현재 context를 다시 읽어서 채우면 안 되고, 가이드 시작 시 저장해 둔 원래 `guided` 이벤트 값을 그대로 복사한다(예: R01 가이드 중 `git switch -c feature/...`로 브랜치가 실제로 바뀌므로, 그때 context를 다시 읽으면 `branch`가 달라져 점검 쿼리에 걸린다. `guide/state.py`에 원래 값을 들고 있어야 함, 11/9 확인).
 - `guide skip`은 별도 action을 만들지 않고 `guide_stopped`로 기록한다.
 - `blocked`는 R03(실행 불가 규칙) 취소에만 쓴다. 다른 규칙에서 Ctrl+C 등으로 중단하는 경우는 이벤트를 남기지 않는다.
 - 다중 위반이면 위반마다 이벤트 1건씩 남긴다(같은 `command_summary`).
+- 위반 수 집계 시 `guided`에 `related_event_id`가 있는 것(= `guide undo` 복구 가이드)은 위반으로 세지 않는다. 대시보드·DB RPC도 같은 기준을 쓴다(11/9 확인).
 - `source`는 `cli` 또는 `github`. 두 경우 모두 같은 스키마.
 - v1은 11/5 확정 후 임지윤·이남주에게 통보했다. 이후 필드 추가·변경은 PR을 올리고 CLI·웹·DB 담당 3명이 모두 승인한다. ERD의 `events.action` 설명도 함께 바꾼다.
 - 시크릿 값은 어떤 필드에도 넣지 않는다.
