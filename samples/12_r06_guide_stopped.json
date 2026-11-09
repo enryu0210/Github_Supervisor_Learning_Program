@@ -1,0 +1,17 @@
+{
+  "id": "4299977a-ab9c-4f0d-95ad-a2875e576e8b",
+  "schema_version": 1,
+  "occurred_at": "2026-11-07T14:19:55+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "namju-lee",
+  "rule_id": "R06",
+  "severity": "low",
+  "action": "guide_stopped",
+  "command_summary": "git commit -m \"fix\"",
+  "branch": "feature/db-schema-update",
+  "pr_number": null,
+  "explanation": "guide skip으로 중단함",
+  "llm_used": false,
+  "related_event_id": "4e220d6f-f7ad-4dc9-af3d-b535d01f5781"
+}

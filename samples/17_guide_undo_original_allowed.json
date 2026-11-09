@@ -1,0 +1,17 @@
+{
+  "id": "c069803a-879f-42a1-ae97-2f99c9c1a421",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T17:00:00+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "ahyeon-kwon",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "allowed",
+  "command_summary": "git push --force origin feature/release-notes",
+  "branch": "feature/release-notes",
+  "pr_number": null,
+  "explanation": null,
+  "llm_used": false,
+  "related_event_id": null
+}

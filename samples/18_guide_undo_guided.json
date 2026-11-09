@@ -1,0 +1,17 @@
+{
+  "id": "136d6a76-4904-4d81-9683-e4bdd49096f2",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T17:25:40+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "ahyeon-kwon",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "guided",
+  "command_summary": "gitcoach guide undo",
+  "branch": "feature/release-notes",
+  "pr_number": null,
+  "explanation": "아까 그냥 실행한 force push를 되돌리고 싶을 때 쓰는 복구 가이드예요. git reflog에서 이전 위치를 찾아볼게요.",
+  "llm_used": true,
+  "related_event_id": "c069803a-879f-42a1-ae97-2f99c9c1a421"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "fbdc3710-2302-4615-8705-0b5eda5520cf",
+  "schema_version": 1,
+  "occurred_at": "2026-11-11T09:00:00+09:00",
+  "source": "github",
+  "repo": "gitcoach-team/git-coach",
+  "member": "hoil-lim",
+  "rule_id": "R05",
+  "severity": "low",
+  "action": "detected",
+  "command_summary": null,
+  "branch": "Feature_Login",
+  "pr_number": null,
+  "explanation": "GitHub 브랜치 목록 조회 결과 브랜치명 규칙 위반 발견(대문자 포함)",
+  "llm_used": false,
+  "related_event_id": null
+}

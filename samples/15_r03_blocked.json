@@ -1,0 +1,17 @@
+{
+  "id": "fe5e4339-1bef-44ac-a194-b5fbccacbf08",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T15:30:08+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "jiyoon-lim",
+  "rule_id": "R03",
+  "severity": "high",
+  "action": "blocked",
+  "command_summary": "git commit -m \"feat(web): local config\"",
+  "branch": "feature/web-login",
+  "pr_number": null,
+  "explanation": "비밀 정보가 포함된 파일(.env)이 staged 상태예요. 그대로 커밋하면 기록에 영구히 남아요.",
+  "llm_used": false,
+  "related_event_id": null
+}

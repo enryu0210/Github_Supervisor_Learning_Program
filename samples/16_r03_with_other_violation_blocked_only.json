@@ -1,0 +1,17 @@
+{
+  "id": "f923dca9-1e8e-40ac-9381-73b5605501bb",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T16:02:45+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "namju-lee",
+  "rule_id": "R03",
+  "severity": "high",
+  "action": "blocked",
+  "command_summary": "git push origin main",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": "비밀 정보가 staged된 채로 main에 직접 push하려고 했어요. R01(main 직접 push)도 함께 걸렸지만, [q] 취소 시에는 R03만 1건 기록해요(다른 위반은 실행되지 않아 별도 이벤트 없음).",
+  "llm_used": false,
+  "related_event_id": null
+}

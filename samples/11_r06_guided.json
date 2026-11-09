@@ -1,0 +1,17 @@
+{
+  "id": "4e220d6f-f7ad-4dc9-af3d-b535d01f5781",
+  "schema_version": 1,
+  "occurred_at": "2026-11-07T14:18:30+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "namju-lee",
+  "rule_id": "R06",
+  "severity": "low",
+  "action": "guided",
+  "command_summary": "git commit -m \"fix\"",
+  "branch": "feature/db-schema-update",
+  "pr_number": null,
+  "explanation": "커밋 메시지가 팀 형식(type(scope): 설명)과 달라요. 나중에 기록을 읽기 어려워져요. 형식에 맞춰 다시 커밋해볼까요?",
+  "llm_used": true,
+  "related_event_id": null
+}

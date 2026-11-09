@@ -1,0 +1,17 @@
+{
+  "id": "7740493d-6705-4c3c-ab8d-7cb50e561bec",
+  "schema_version": 1,
+  "occurred_at": "2026-11-08T10:11:00+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "hoil-lim",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "guided",
+  "command_summary": "git push --force origin main",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": "같은 명령에 force push 위반도 함께 걸렸어요. main 가이드가 끝나면 이어서 안내할게요.",
+  "llm_used": true,
+  "related_event_id": null
+}
