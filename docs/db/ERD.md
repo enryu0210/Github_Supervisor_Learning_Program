@@ -1,7 +1,7 @@
 # ERD — Supabase DB
 
 > 버전: **v1** (2026-11-08 확정) · 담당: 이남주(DB)
-> 기준: CLI v0.1 설계의 이벤트 스키마 v1 + 권아현(CLI·watcher)과의 질의응답
+> 기준: 이벤트 JSON 계약은 [`docs/guide/01_cli.md` 6절](../guide/01_cli.md)(이벤트 스키마 v1)을 따른다. 이 문서는 테이블·DB 제약·점검 쿼리·인덱스·RLS·뷰의 기준이다.
 >
 > 테이블은 `supabase/migrations/`의 마이그레이션으로만 만든다(11/14~). 이 문서와 마이그레이션이 다르면 마이그레이션이 실제 상태다.
 > 스키마(특히 이벤트 JSON) 필드를 추가·변경하려면 PR + CLI·웹·DB 담당 3명 승인이 필요하다.
@@ -208,6 +208,7 @@ erDiagram
 
 - 위반이 **없는** 명령은 기록하지 않는다. `events`에는 위반 기록만 있다.
 - 한 명령에 위반이 여러 개면 위반마다 이벤트가 하나씩(id 따로) 생긴다.
+- 단, R03이 다른 위반과 함께 걸려 [q]로 취소하면 R03 `blocked` 하나만 남기고 함께 걸린 위반은 기록하지 않는다(명령이 실행되지 않았으므로).
 - 가이드 결과(`guide_completed`·`guide_stopped`)의 `rule_id`·`severity`·`repo`·`member`·`branch`는 원래 `guided`와 같다.
 - 다른 규칙에서 Ctrl+C로 중간에 끈 명령은 이벤트가 남지 않는다.
 
@@ -273,4 +274,4 @@ erDiagram
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
-| v1 | 2026-11-08 | action을 v1 값 6개로 교체(v0 `blocked/ran/warned` 폐기), `related_event_id` 추가, `severity` 값 확정, `members.auth_user_id` 채택, `quizzes.created_at` 추가, 소문자·allowed 제약 확정, 퀴즈 id를 CLI 생성으로 변경 |
+| v1 | 2026-11-08 | action을 v1 값 6개로 교체(v0 `blocked/ran/warned` 폐기), `related_event_id` 추가, `severity` 값 확정, `members.auth_user_id` 채택, `quizzes.created_at` 추가, 소문자·allowed 제약 확정, 퀴즈 id를 CLI 생성으로 변경, `prs.title` 추가, `quiz_attempts.correct` → `is_correct` (PR #12 리뷰) |
