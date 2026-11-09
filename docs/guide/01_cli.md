@@ -247,10 +247,11 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
 | 방치된 PR | 마지막 활동 후 N일 이상 열린 PR(N은 팀이 정함) | `prs.last_activity_at` |
 | 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함 |
+| PR 리뷰 원본 기록(`pr_reviews`) | `GET /repos/{owner}/{repo}/pulls/{number}/reviews` | 이남주 DB 요청(11/9, 동의 완료). 리뷰 쏠림과 같은 호출 재사용. 필드: `review_id`(네이티브 id)·`repo`·`pr_number`·`reviewer`·`status`·`submitted_at`·`commit_sha`·`html_url`(`body` 제외) |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
-- DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`.
+- DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`. `pr_reviews`도 동일 — 11/14 마이그레이션 전까지는 JSON으로 제공하고, 실제 DB 적재는 11/17~ 일정에 맞춘다(11/9 확정).
 - 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만.
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
 
@@ -301,7 +302,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 장일호 | upstream develop 브랜치 보호(승인 1명+), 골격 PR 리뷰, fork PR CI 승인 | 첫 테스트가 올라오면 ci-test 추가, v0.1 이후 pr-convention에 쓸 규칙 엔진 | 11/6 |
 | 임호일 | Windows PC 설치 확인(`pip install -e .` + `gitcoach init`), 패키징 결과 | 11/9 v0.1.0 인계, 설치 절차, `gitcoach doctor` 사양 | 11/9 |
 | 임지윤 | 스키마 v1 변경 확인, 화면에서 필요한 필드 요청 | 스키마 v1(통보), 샘플 이벤트 JSON 20건+ | 11/9 |
-| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양 | 11/9 |
+| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양, `pr_reviews` 소스 필드 정의(11/9, 동의 완료) | 11/9 |
 | 모두 | 가이드 문구·단계가 입문자에게 이해되는지 짧은 피드백 | — | 11/9 |
 
 ## 8. 완료 기준
