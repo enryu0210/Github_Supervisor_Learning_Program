@@ -44,6 +44,7 @@
 | R05 | 브랜치명 규칙 위반 | `checkout -b`, `switch -c`, `branch` | P1 | low | 가능 |
 | R06 | 커밋 메시지 규칙 위반 | `commit -m` | P1 | low | 가능 |
 | R07 | 되돌리기 어려운 명령(`reset --hard`, `clean -fd`, `branch -D`) | 해당 명령 | **v0.2** | medium | 가능 |
+| R08 | PR 대상 브랜치 오류(feature → main, develop이어야 함) | N/A(watcher, GitHub PR API) | P1 | low | N/A(watcher 전용, 선택지 없음) |
 
 - P0은 반드시, P1은 되도록, P2는 시간이 남으면 한다. R07은 v0.2로 미룬다.
 - 검사 기준: 브랜치 `feature|fix/<영역>-<설명>`(영역: cli·watcher·web·db·infra·docs, 대문자·`#` 금지), 커밋 `type(scope): 설명`.
@@ -213,6 +214,13 @@ git-coach/
 | `gitcoach sync` | 로그를 DB로 업로드. **v0.1에서는 stub만** |
 | `gitcoach uninstall` | 래퍼 제거 |
 
+**`gitcoach sync` 사양 (11/9 확정, 이남주 확인 완료)**
+- 배치: 미전송 이벤트를 최대 100건씩 묶어 전송
+- 응답 형식: 건별로 원본 이벤트 `id`와 함께 `inserted`(새로 저장)·`duplicate`(이미 저장됨 → CLI는 전송 성공으로 처리)·`rejected`(저장 안 됨, 틀린 필드·이유 포함) 중 하나
+- 인증: `Authorization: Bearer <토큰>` 헤더. 토큰은 환경변수 `GITCOACH_SYNC_TOKEN`
+- 엔드포인트 주소도 환경변수 `GITCOACH_SYNC_URL`로 받는다(`SUPABASE_URL`과 같은 방식 — config.toml은 개인 설정용이라 팀 공용 인프라 주소·토큰은 안 둔다)
+- 실제 주소·토큰 발급은 11/17~18(이남주), `.env`에만 저장, 레포에는 `.env.example`만
+
 ### 3-8. PR 쪼개기 (1 PR = 1 목적, ~300줄, base는 upstream develop)
 1. `feature/cli-project-skeleton` — 골격, pyproject, ci-lint·ci-test
 2. `feature/cli-git-shim` — 가로채기, 터미널 판단, 통과 로직
@@ -243,15 +251,15 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 감지 대상 | 방법(제안) | 비고 |
 |---|---|---|
 | 브랜치명 규칙 위반 | 브랜치 목록 조회 후 R05 재사용 | 공용 규칙 엔진 |
-| PR 대상 브랜치 오류(feature → main) | 열린 PR의 base 확인 | feature는 develop으로 |
+| PR 대상 브랜치 오류(feature → main, R08) | 열린 PR의 base 확인 | feature는 develop으로. R08은 watcher 전용(11/9 확정, 심각도 low — R05·R06 선례 따름) |
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
-| 방치된 PR | 마지막 활동 후 N일 이상 열린 PR(N은 팀이 정함) | `prs.last_activity_at` |
-| 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함 |
+| 방치된 PR | 마지막 활동 후 N일 이상 열린 PR(N은 팀이 정함) | `prs.last_activity_at`. R08과 무관(성격이 다른 신호라 규칙 위반 통계에서 제외, rule_id는 11/17~19 착수 때 따로 정함, 11/9 결정) |
+| 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함. 방치 PR과 동일하게 규칙 위반 통계에서 제외 |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`.
-- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만.
+- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GITCOACH_SYNC_URL`, `GITCOACH_SYNC_TOKEN`(3-7 `gitcoach sync` 사양). 실제 값은 `.env`에만, 레포에는 `.env.example`만.
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
 
 ## 6. 이벤트 스키마 v1 (내가 지키는 계약)
@@ -284,6 +292,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | `guide_stopped` | 가이드를 중간에 그만둠 |
 | `detected` | watcher가 GitHub에서 발견 |
 
+- `id` 생성: uuid5. namespace는 `events.py`에 고정 UUID 리터럴로 박아둠(런타임 재계산 없음). 대상 문자열은 `f"{rule_id}\x1f{repo.lower()}\x1f{entity}"`(`\x1f`는 브랜치명에 못 들어가는 구분자). entity는 R05=브랜치명 그대로, R06=커밋 SHA 전체(40자), PR 관련=`pr:{번호}`. watcher가 같은 위반을 여러 번 폴링해도 같은 id가 나와 중복 이벤트가 쌓이지 않는다(11/9 확정).
 - `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null.
 - `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다.
 - `guide skip`은 별도 action을 만들지 않고 `guide_stopped`로 기록한다.
@@ -300,7 +309,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 |---|---|---|---|
 | 장일호 | upstream develop 브랜치 보호(승인 1명+), 골격 PR 리뷰, fork PR CI 승인 | 첫 테스트가 올라오면 ci-test 추가, v0.1 이후 pr-convention에 쓸 규칙 엔진 | 11/6 |
 | 임호일 | Windows PC 설치 확인(`pip install -e .` + `gitcoach init`), 패키징 결과 | 11/9 v0.1.0 인계, 설치 절차, `gitcoach doctor` 사양 | 11/9 |
-| 임지윤 | 스키마 v1 변경 확인, 화면에서 필요한 필드 요청 | 스키마 v1(통보), 샘플 이벤트 JSON 20건+ | 11/9 |
+| 임지윤 | 스키마 v1 변경 확인, 화면에서 필요한 필드 요청 | 스키마 v1(통보), 샘플 이벤트 JSON 20건+(더미, PR #19. 실 코드 완성 후 교체) | 11/9 |
 | 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양 | 11/9 |
 | 모두 | 가이드 문구·단계가 입문자에게 이해되는지 짧은 피드백 | — | 11/9 |
 
