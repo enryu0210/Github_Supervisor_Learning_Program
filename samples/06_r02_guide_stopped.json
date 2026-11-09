@@ -1,0 +1,17 @@
+{
+  "id": "5cb45ea8-71ac-4e57-9188-bfc7e126bc4b",
+  "schema_version": 1,
+  "occurred_at": "2026-11-06T13:44:51+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "jiyoon-lim",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "guide_stopped",
+  "command_summary": "git push --force origin feature/web-login",
+  "branch": "feature/web-login",
+  "pr_number": null,
+  "explanation": "pull --rebase 단계에서 guide stop으로 중단함",
+  "llm_used": false,
+  "related_event_id": "5a0a8085-5a44-4551-9230-6529ba11a8c7"
+}

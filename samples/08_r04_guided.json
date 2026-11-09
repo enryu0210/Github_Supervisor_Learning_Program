@@ -1,0 +1,17 @@
+{
+  "id": "7d9120d0-b24a-4f83-bc9f-668ff10e22f8",
+  "schema_version": 1,
+  "occurred_at": "2026-11-07T09:20:40+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "hoil-lim",
+  "rule_id": "R04",
+  "severity": "medium",
+  "action": "guided",
+  "command_summary": "git commit -m \"feat(cli): config 추가\"",
+  "branch": "main",
+  "pr_number": null,
+  "explanation": "지금 main 위에서 바로 커밋하고 있어요. 당장은 괜찮아 보여도 다음 push에서 문제가 생겨요. feature 브랜치로 옮겨서 커밋해볼까요?",
+  "llm_used": true,
+  "related_event_id": null
+}

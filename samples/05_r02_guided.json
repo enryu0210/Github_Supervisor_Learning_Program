@@ -1,0 +1,17 @@
+{
+  "id": "5a0a8085-5a44-4551-9230-6529ba11a8c7",
+  "schema_version": 1,
+  "occurred_at": "2026-11-06T13:40:09+09:00",
+  "source": "cli",
+  "repo": "gitcoach-team/git-coach",
+  "member": "jiyoon-lim",
+  "rule_id": "R02",
+  "severity": "high",
+  "action": "guided",
+  "command_summary": "git push --force origin feature/web-login",
+  "branch": "feature/web-login",
+  "pr_number": null,
+  "explanation": "force push는 원격 기록을 덮어써요. 다른 사람이 같은 브랜치에 커밋을 올렸다면 그 커밋이 사라질 수 있어요. 먼저 원격 변경을 가져와서 안전하게 합쳐볼까요?",
+  "llm_used": true,
+  "related_event_id": null
+}
