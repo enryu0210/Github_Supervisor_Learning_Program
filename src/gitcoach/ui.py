@@ -15,6 +15,10 @@ def print_cancelled() -> None:
     console.print("원래 명령을 취소했어요.")
 
 
+def print_guide_message(message: str) -> None:
+    console.print(message)
+
+
 def _print_violations(violations: list[Violation], blocked: bool) -> None:
     if len(violations) == 1:
         v = violations[0]

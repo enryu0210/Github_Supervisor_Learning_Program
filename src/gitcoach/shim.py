@@ -1,8 +1,8 @@
 import subprocess
 import sys
 
-from gitcoach import context, parser, rules, ui
-from gitcoach.models import Choice
+from gitcoach import context, guide, parser, rules, ui
+from gitcoach.models import Choice, GuideAction
 
 
 def is_interactive() -> bool:
@@ -12,6 +12,15 @@ def is_interactive() -> bool:
 def run(argv: list[str]) -> int:
     if not is_interactive():
         return _exec_git(argv)
+
+    outcome = guide.on_command(argv)
+    if outcome.action in (GuideAction.EXEC_AND_ADVANCE, GuideAction.EXEC_AND_REMIND):
+        code = _exec_git(argv)
+        if outcome.message:
+            ui.print_guide_message(outcome.message)
+        return code
+    if outcome.action is GuideAction.FALLTHROUGH and outcome.message:
+        ui.print_guide_message(outcome.message)
 
     cmd = parser.parse(argv)
     ctx = context.collect(cmd)
@@ -26,7 +35,9 @@ def run(argv: list[str]) -> int:
         return 1  # TODO(cli-event-log): blocked 기록
 
     ui.print_cancelled()
-    return 1  # TODO(cli-guide-engine): 가이드 시작
+    guide_state = guide.start(violations, ctx)
+    ui.print_guide_message(guide.start_message(guide_state, " ".join(["git", *argv])))
+    return 1  # TODO(cli-event-log): 위반마다 guided 기록
 
 
 def _exec_git(argv: list[str]) -> int:
