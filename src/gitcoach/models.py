@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 
 
 @dataclass
@@ -18,3 +19,21 @@ class Context:
     staged_files: list[str]
     protected_branches: list[str]
     interactive: bool
+
+
+@dataclass
+class Violation:
+    rule_id: str
+    title: str
+    severity: str
+    facts: dict
+    guide_id: str
+    allow_run: bool
+    warning: str
+    consequence: str
+
+
+class Choice(Enum):
+    RUN = "1"
+    GUIDE = "2"
+    CANCEL = "q"
