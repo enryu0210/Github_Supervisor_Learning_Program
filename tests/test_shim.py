@@ -96,7 +96,9 @@ def test_run_interactive_cancel_choice_blocks(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation(allow_run=False)])
+    monkeypatch.setattr(
+        rules, "evaluate", lambda cmd, ctx: [_violation(allow_run=False)]
+    )
     monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.CANCEL)
     assert shim.run(["status"]) == 1
 

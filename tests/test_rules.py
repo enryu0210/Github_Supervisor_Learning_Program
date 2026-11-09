@@ -40,5 +40,7 @@ def test_evaluate_sorts_by_severity(monkeypatch) -> None:
     )
     monkeypatch.setattr(rules, "_RULES", [lambda cmd, ctx: low, lambda cmd, ctx: high])
 
-    result = rules.evaluate(Command(subcommand="push", flags=[], positionals=[]), _ctx())
+    result = rules.evaluate(
+        Command(subcommand="push", flags=[], positionals=[]), _ctx()
+    )
     assert [v.rule_id for v in result] == ["RY", "RX"]
