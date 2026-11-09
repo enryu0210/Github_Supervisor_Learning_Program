@@ -26,8 +26,8 @@
 | 11/8 | Ollama 설명·캐시, R04·R05·R06, init·doctor·config·log, "그냥 실행" 영향 문구 | Ollama를 꺼도 동작한다 |
 | 11/9 | Windows(PowerShell·Git Bash) 확인, 스키마 v1 고정, `samples/` 20건+, v0.1.0 태그 / 인계 | 팀원 PC 2대 이상 설치 |
 | 11/10~11/19 | watcher 개발 (5장) | 우리 레포의 위반이 이벤트로 출력된다 |
-| 11/20~11/23 | Compose에 watcher 통합, DB 연결 (장일호·임호일과 함께) | `docker compose up`으로 watcher가 돈다 |
-| 11/24~11/26 | 퀴즈 생성 주도(오답·허용 이벤트 → Ollama → `quizzes`). DB 저장은 이남주와 함께 | 대시보드에 퀴즈가 나온다 |
+| 11/20~11/23 | Compose 컨테이너 통합 (장일호·임호일과 함께). DB 쓰기 자체는 11/17~ 이미 시작(5장). **추후 결정**: DB 쓰기 코드 담당 구분(권아현·이남주 vs 장일호·임호일) — 장일호 확인 예정 | `docker compose up`으로 watcher가 돈다 |
+| 11/24~11/26 | 퀴즈 생성 주도. **watcher가 DB 이벤트 기준으로 생성·전송**(오답·허용 이벤트 → Ollama → `quizzes`), CLI `sync`는 관여 안 함(11/9 확정, 남주 전달) | 대시보드에 퀴즈가 나온다 |
 | 11/27~12/4 | 테스트·보완, 도그푸딩 결과 정리, 발표 준비 | 발표 데모가 재현된다 |
 
 > 11/5 착수라 Sprint 1이 이틀 밀렸다. 11/9 v0.1.0은 지킨다. R07은 v0.2로 미루고, P2(되돌릴 수 없는 명령 추가 확인, 상황별 심각도 조절)는 시간이 남으면 한다.
@@ -210,7 +210,7 @@ git-coach/
 | `gitcoach log [--today]` | 내 위반·선택 기록 보기 |
 | `gitcoach explain <R01>` | 규칙 설명 미리 보기(학습용) |
 | `gitcoach guide [hint\|done\|skip\|stop\|undo]` | 학습 가이드 진행 |
-| `gitcoach sync` | 로그를 DB로 업로드. **v0.1에서는 stub만** |
+| `gitcoach sync` | 팀 토큰으로 Supabase Edge Function `ingest-events`를 호출해 로그를 올린다(CLI는 DB에 직접 쓰지 않음). **v0.1에서는 stub만**. 퀴즈는 포함하지 않음(퀴즈는 watcher 담당, 11/9 확정) |
 | `gitcoach uninstall` | 래퍼 제거 |
 
 ### 3-8. PR 쪼개기 (1 PR = 1 목적, ~300줄, base는 upstream develop)
@@ -224,9 +224,10 @@ git-coach/
 8. `feature/cli-explain-ollama` — LLM 설명, 템플릿 폴백, 캐시
 9. `feature/cli-rule-direct-commit`(R04), `feature/cli-rule-naming`(R05·R06)
 10. `feature/cli-config` — `config.py`(설정 병합, 보호 브랜치) + `gitcoach config` 커맨드. `context.py`가 하드코딩 대신 이 모듈을 읽도록 교체
-11. `feature/cli-init-doctor` — `gitcoach init`(쉘 래퍼 설치·Ollama 연결 확인·설정 파일 생성, member 자동 감지) + `gitcoach uninstall`(래퍼 제거) + `gitcoach doctor`(상태 점검)
-12. (P2) `feature/cli-irreversible-confirm`(추가 확인), `feature/cli-severity-context`(상황별 심각도)
-13. (v0.2) `feature/cli-rule-destructive`(R07)
+11. `feature/cli-sync` — 팀 토큰(`config.py`) + Edge Function `ingest-events` 호출로 `gitcoach sync` 실구현(stub 교체). 팀 토큰은 `~/.gitcoach/config.toml`에 평문 저장(11/9 확정, 홈 디렉터리라 레포 커밋 대상 아님, 화면·로그에 값 노출 금지)
+12. `feature/cli-init-doctor` — `gitcoach init`(쉘 래퍼 설치·Ollama 연결 확인·설정 파일 생성, member 자동 감지) + `gitcoach uninstall`(래퍼 제거) + `gitcoach doctor`(상태 점검)
+13. (P2) `feature/cli-irreversible-confirm`(추가 확인), `feature/cli-severity-context`(상황별 심각도)
+14. (v0.2) `feature/cli-rule-destructive`(R07)
 
 ## 4. 결정 사항 (11/5)
 - [x] 스키마 v1의 `action` 값 → 6장의 6개 값으로 확정. 임지윤·이남주에게 변경 통보
@@ -245,8 +246,8 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 브랜치명 규칙 위반 | 브랜치 목록 조회 후 R05 재사용 | 공용 규칙 엔진 |
 | PR 대상 브랜치 오류(feature → main) | 열린 PR의 base 확인 | feature는 develop으로 |
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
-| 방치된 PR | 마지막 활동 후 **3일**(11/9 임시 결정, N 확정 전까지 watcher·대시보드·DB 뷰 공통 사용) 이상 열린 PR | `prs.last_activity_at` |
-| 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함 |
+| 방치된 PR | 마지막 활동 후 **3일**(11/9 임시 결정, N 확정 전까지 watcher·대시보드·DB 뷰 공통 사용) 이상 열린 PR | `prs.last_activity_at`. 이 감지를 `detected` 이벤트로도 남길지는 **추후 결정**(D2, 뷰 판정만으로 대체 가능) |
+| 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함. rule_id·이벤트화 여부도 **추후 결정**(D2, 위와 동일 건) |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - PR 데이터 수집 시 `author`·`reviewers`는 GitHub API 값을 그대로 쓰지 않고 `lower()` 처리 후 저장한다(DB `members.github_login` 소문자 제약과 매칭, 11/9 결정).
@@ -254,8 +255,10 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 - PR `title`은 항상 존재하는 값으로 보고 필수로 수집한다(방치 PR 목록 표시용, `prs.title` not null).
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`.
+- 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙).
 - 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만.
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
+- **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다. CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
 
 ## 6. 이벤트 스키마 v1 (내가 지키는 계약)
 ```json
@@ -287,6 +290,17 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | `guide_stopped` | 가이드를 중간에 그만둠 |
 | `detected` | watcher가 GitHub에서 발견 |
 
+- `id`: `uuid5(namespace=events.py에 고정한 UUID 리터럴, name=f"{rule_id}\x1f{repo.lower()}\x1f{entity}")`. CLI 이벤트는 규칙별 대상을 `entity`로 쓴다(상세는 `events.py` 구현). watcher `detected`도 같은 공식을 재사용하는 안을 제안했다(**D1, 미정** — 이남주 확인 필요). 같은 위반을 반복 감지해도 `entity`가 같으면 id가 같아져 `on conflict (id) do nothing`으로 중복이 걸러질 것으로 예상. 제안하는 규칙별 `entity`:
+
+  | 규칙 | entity(제안) |
+  |---|---|
+  | R01 (main 직접 push) | push된 커밋 SHA |
+  | R02 (force push) | `f"{branch}:{new_head_sha}"` |
+  | R05 (브랜치명 규칙 위반) | 브랜치명 |
+  | R06 (커밋 메시지 규칙 위반) | 커밋 SHA |
+  | R08 (PR 대상 브랜치 오류) | PR 번호 |
+
+  방치 PR·리뷰 쏠림은 rule_id 자체가 D2 확정 전까지 없으므로 `entity`도 D2 확정 후 추가한다.
 - `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null.
 - `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다. **구현 시 주의**: 이 값은 현재 context를 다시 읽어서 채우면 안 되고, 가이드 시작 시 저장해 둔 원래 `guided` 이벤트 값을 그대로 복사한다(예: R01 가이드 중 `git switch -c feature/...`로 브랜치가 실제로 바뀌므로, 그때 context를 다시 읽으면 `branch`가 달라져 점검 쿼리에 걸린다. `guide/state.py`에 원래 값을 들고 있어야 함, 11/9 확인).
 - `guide skip`은 별도 action을 만들지 않고 `guide_stopped`로 기록한다.
@@ -305,7 +319,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 장일호 | upstream develop 브랜치 보호(승인 1명+), 골격 PR 리뷰, fork PR CI 승인 | 첫 테스트가 올라오면 ci-test 추가, v0.1 이후 pr-convention에 쓸 규칙 엔진 | 11/6 |
 | 임호일 | Windows PC 설치 확인(`pip install -e .` + `gitcoach init`), 패키징 결과 | 11/9 v0.1.0 인계, 설치 절차, `gitcoach doctor` 사양 | 11/9 |
 | 임지윤 | 스키마 v1 변경 확인, 화면에서 필요한 필드 요청 | 스키마 v1(통보), 샘플 이벤트 JSON 20건+ | 11/9 |
-| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양 | 11/9 |
+| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양. **추후 결정**: data-flow ④⑤ "이남주 공동 담당"의 실제 범위(DB 적재 코드 공동작성 vs 스키마/리뷰 지원) — 이남주 확인 예정 | 11/9 |
 | 모두 | 가이드 문구·단계가 입문자에게 이해되는지 짧은 피드백 | — | 11/9 |
 
 ## 8. 완료 기준
