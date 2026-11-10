@@ -98,6 +98,23 @@ def record(event: Event) -> None:
         conn.close()
 
 
+def update_explanation(event_id: str, explanation: str, llm_used: bool) -> None:
+    """가이드 시작 시점에 이미 insert된 guided 이벤트에 설명을 나중에 채운다.
+    다중 위반 큐에서 2번째 이후 가이드는 그 가이드가 실제로 시작될 때(이전 가이드가
+    끝난 뒤, 보통 다른 프로세스 실행)에만 설명을 알 수 있어 insert 시점엔 비어 있다."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(_SCHEMA)
+        conn.execute(
+            "UPDATE events SET explanation = ?, llm_used = ? WHERE id = ?",
+            (explanation, int(llm_used), event_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def query(*, today: bool = False) -> list[Event]:
     if not DB_PATH.exists():
         return []
