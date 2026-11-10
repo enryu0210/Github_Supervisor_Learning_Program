@@ -1,9 +1,16 @@
 import subprocess
 
-from gitcoach import events, guide
+from gitcoach import events, explain, guide
 from gitcoach.guide import matcher, state
 from gitcoach.guide.scenarios import SCENARIOS
-from gitcoach.models import Command, Context, GuideAction, Violation
+from gitcoach.models import Command, Context, Explanation, GuideAction, Violation
+
+
+def _stub_explain(monkeypatch, text: str = "설명", llm_used: bool = False) -> None:
+    """실제 Ollama 호출 없이 큐의 다음 가이드로 넘어가는 테스트용 스텁."""
+    monkeypatch.setattr(
+        explain, "explain", lambda rule_id, title, facts: Explanation(text, llm_used)
+    )
 
 
 def _use_tmp_db(tmp_path, monkeypatch) -> None:
@@ -193,6 +200,7 @@ def test_multi_violation_queue_moves_to_next_guide_on_completion(
     monkeypatch.chdir(tmp_path)
     _init_repo()
     _use_tmp_db(tmp_path, monkeypatch)
+    _stub_explain(monkeypatch)
     guide.start(
         [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")], _ctx()
     )
@@ -211,6 +219,7 @@ def test_skip_moves_to_next_guide_in_queue(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
     _use_tmp_db(tmp_path, monkeypatch)
+    _stub_explain(monkeypatch)
     guide.start(
         [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")], _ctx()
     )
@@ -281,3 +290,75 @@ def test_r03_step1_requires_the_flagged_file(tmp_path, monkeypatch) -> None:
 
     right_file = guide.on_command(["restore", "--staged", ".env"])
     assert right_file.action is GuideAction.EXEC_AND_ADVANCE
+
+
+def test_start_message_includes_explanation_before_guide_header(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _stub_explain(monkeypatch, text="main은 팀 전체가 공유하는 브랜치예요.")
+    guide_state = guide.start([_violation()], _ctx())
+    message = guide.start_message(guide_state, "git push origin main")
+    assert "💡 왜 문제일까요?" in message
+    assert "main은 팀 전체가 공유하는 브랜치예요." in message
+    assert message.index("💡") < message.index("📘")
+
+
+def test_second_guide_in_queue_gets_its_own_explanation_and_updates_event(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+
+    seen_rule_ids = []
+
+    def fake_explain(rule_id, title, facts):
+        seen_rule_ids.append(rule_id)
+        return Explanation(f"{rule_id} 설명", False)
+
+    monkeypatch.setattr(explain, "explain", fake_explain)
+
+    ev1 = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push --force origin main",
+    )
+    ev2 = events.make_event(
+        rule_id="R02",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push --force origin main",
+    )
+    events.record(ev1)
+    events.record(ev2)
+
+    guide_state = guide.start(
+        [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")],
+        _ctx(),
+        [ev1, ev2],
+        "git push --force origin main",
+    )
+    first_message = guide.start_message(guide_state, "git push --force origin main")
+    assert "R01 설명" in first_message
+    assert seen_rule_ids == ["R01"], (
+        "최초 가이드 시작 시에는 첫 위반의 설명만 불러야 해요"
+    )
+
+    guide.on_command(["switch", "-c", "feature/cli-login-fix"])
+    subprocess.run(["git", "switch", "-c", "feature/cli-login-fix"], check=True)
+    guide.on_command(["push", "-u", "origin", "feature/cli-login-fix"])
+    second_message = guide.done()
+
+    assert "R02 설명" in second_message
+    assert seen_rule_ids == ["R01", "R02"], (
+        "다음 가이드로 넘어갈 때만 두 번째 설명을 불러야 해요"
+    )
+
+    guided_rows = {e.rule_id: e for e in events.query() if e.action == "guided"}
+    assert guided_rows["R01"].explanation == "R01 설명"
+    assert guided_rows["R02"].explanation == "R02 설명"
