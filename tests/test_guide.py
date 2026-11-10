@@ -94,6 +94,12 @@ def test_on_command_none_when_no_guide_active(tmp_path, monkeypatch) -> None:
     assert outcome.action is GuideAction.NONE
 
 
+def test_on_command_outside_git_repo_does_not_crash(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    outcome = guide.on_command(["clone", "x"])
+    assert outcome.action is GuideAction.NONE
+
+
 def test_on_command_check_command_reminds(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
