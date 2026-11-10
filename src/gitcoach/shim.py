@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from gitcoach import context, guide, parser, rules, ui
+from gitcoach import context, events, guide, parser, rules, ui
 from gitcoach.models import Choice, GuideAction
 
 
@@ -29,15 +29,49 @@ def run(argv: list[str]) -> int:
         return _exec_git(argv)
 
     choice = ui.prompt_choice(violations)
+    command_summary = " ".join(["git", *argv])
+
     if choice is Choice.RUN:
-        return _exec_git(argv)  # TODO(cli-event-log): allowed 기록
+        for v in violations:
+            events.record(
+                events.make_event(
+                    rule_id=v.rule_id,
+                    severity=v.severity,
+                    branch=ctx.current_branch,
+                    action="allowed",
+                    command_summary=command_summary,
+                )
+            )
+        return _exec_git(argv)
+
     if choice is Choice.CANCEL:
-        return 1  # TODO(cli-event-log): blocked 기록
+        blocked_v = next(v for v in violations if not v.allow_run)
+        events.record(
+            events.make_event(
+                rule_id=blocked_v.rule_id,
+                severity=blocked_v.severity,
+                branch=ctx.current_branch,
+                action="blocked",
+                command_summary=command_summary,
+            )
+        )
+        return 1
 
     ui.print_cancelled()
-    guide_state = guide.start(violations, ctx)
-    ui.print_guide_message(guide.start_message(guide_state, " ".join(["git", *argv])))
-    return 1  # TODO(cli-event-log): 위반마다 guided 기록
+    guide_events = []
+    for v in violations:
+        ev = events.make_event(
+            rule_id=v.rule_id,
+            severity=v.severity,
+            branch=ctx.current_branch,
+            action="guided",
+            command_summary=command_summary,
+        )
+        events.record(ev)
+        guide_events.append(ev)
+    guide_state = guide.start(violations, ctx, guide_events, command_summary)
+    ui.print_guide_message(guide.start_message(guide_state, command_summary))
+    return 1
 
 
 def _exec_git(argv: list[str]) -> int:

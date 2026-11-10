@@ -1,9 +1,13 @@
 import subprocess
 
-from gitcoach import guide
+from gitcoach import events, guide
 from gitcoach.guide import matcher, state
 from gitcoach.guide.scenarios import SCENARIOS
 from gitcoach.models import Command, Context, GuideAction, Violation
+
+
+def _use_tmp_db(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(events, "DB_PATH", tmp_path / "events.db")
 
 
 def _init_repo() -> None:
@@ -141,6 +145,7 @@ def test_done_advances_git_outside_step_and_completes_single_guide(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     guide.start([_violation()], _ctx())
 
     outcome1 = guide.on_command(["switch", "-c", "feature/cli-login-fix"])
@@ -155,11 +160,39 @@ def test_done_advances_git_outside_step_and_completes_single_guide(
     assert state.load() is None
 
 
+def test_done_records_guide_completed_pointing_at_original_guided_event(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev)
+    guide.start([_violation()], _ctx(), [ev], "git push origin main")
+
+    guide.on_command(["switch", "-c", "feature/cli-login-fix"])
+    subprocess.run(["git", "switch", "-c", "feature/cli-login-fix"], check=True)
+    guide.on_command(["push", "-u", "origin", "feature/cli-login-fix"])
+    guide.done()
+
+    rows = [e for e in events.query() if e.action == "guide_completed"]
+    assert len(rows) == 1
+    assert rows[0].related_event_id == ev.id
+    assert rows[0].command_summary == "git push origin main"
+
+
 def test_multi_violation_queue_moves_to_next_guide_on_completion(
     tmp_path, monkeypatch
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     guide.start(
         [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")], _ctx()
     )
@@ -177,16 +210,43 @@ def test_multi_violation_queue_moves_to_next_guide_on_completion(
 def test_skip_moves_to_next_guide_in_queue(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     guide.start(
         [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")], _ctx()
     )
     guide.skip()
     assert state.load().queue[0].rule_id == "R02"
+    assert events.query() == []
+
+
+def test_skip_records_guide_stopped_pointing_at_original_guided_event(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev)
+    guide.start([_violation()], _ctx(), [ev], "git push origin main")
+
+    guide.skip()
+
+    rows = [e for e in events.query() if e.action == "guide_stopped"]
+    assert len(rows) == 1
+    assert rows[0].related_event_id == ev.id
+    assert rows[0].command_summary == "git push origin main"
 
 
 def test_skip_last_guide_clears_state(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     guide.start([_violation()], _ctx())
     guide.skip()
     assert state.load() is None
@@ -195,6 +255,7 @@ def test_skip_last_guide_clears_state(tmp_path, monkeypatch) -> None:
 def test_stop_clears_entire_queue(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     guide.start(
         [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")], _ctx()
     )

@@ -1,8 +1,9 @@
-from gitcoach import context, parser
+from gitcoach import context, events, parser
 from gitcoach.guide import matcher, state
 from gitcoach.guide.scenarios import SCENARIOS
 from gitcoach.models import (
     Context,
+    Event,
     GuideAction,
     GuideOutcome,
     GuideState,
@@ -14,7 +15,13 @@ from gitcoach.models import (
 _NO_GUIDE = "진행 중인 가이드가 없어요."
 
 
-def start(violations: list[Violation], ctx: Context) -> GuideState:
+def start(
+    violations: list[Violation],
+    ctx: Context,
+    guide_events: list[Event] | None = None,
+    command_summary: str = "",
+) -> GuideState:
+    guide_events = guide_events or [None] * len(violations)
     queue = [
         ViolationSnapshot(
             rule_id=v.rule_id,
@@ -22,8 +29,10 @@ def start(violations: list[Violation], ctx: Context) -> GuideState:
             branch=ctx.current_branch,
             guide_id=v.guide_id,
             facts=v.facts,
+            event_id=ev.id if ev else None,
+            command_summary=command_summary,
         )
-        for v in violations
+        for v, ev in zip(violations, guide_events, strict=True)
     ]
     guide_state = GuideState(queue=queue, step_index=0, hint_count=0)
     state.save(guide_state)
@@ -106,7 +115,18 @@ def _stop_current(*, advance_queue: bool) -> str:
     guide_state = state.load()
     if guide_state is None:
         return _NO_GUIDE
-    # TODO(cli-event-log): guide_stopped 기록 — guide_state.queue[0] 스냅샷 사용
+    snap = guide_state.queue[0]
+    if snap.event_id is not None:
+        events.record(
+            events.make_event(
+                rule_id=snap.rule_id,
+                severity=snap.severity,
+                branch=snap.branch,
+                action="guide_stopped",
+                command_summary=snap.command_summary,
+                related_event_id=snap.event_id,
+            )
+        )
 
     if not advance_queue:
         state.clear()
@@ -138,7 +158,18 @@ def _advance(guide_state: GuideState, scenario: Scenario) -> str:
         step = scenario.steps[guide_state.step_index]
         return f"✅ 완료! {_format_step(scenario, guide_state, step)}"
 
-    # TODO(cli-event-log): guide_completed 기록 — guide_state.queue[0] 스냅샷 사용
+    snap = guide_state.queue[0]
+    if snap.event_id is not None:
+        events.record(
+            events.make_event(
+                rule_id=snap.rule_id,
+                severity=snap.severity,
+                branch=snap.branch,
+                action="guide_completed",
+                command_summary=snap.command_summary,
+                related_event_id=snap.event_id,
+            )
+        )
     summary = f"✅ 가이드 완료! 배운 점: {scenario.summary}"
     guide_state.queue.pop(0)
     guide_state.step_index = 0
