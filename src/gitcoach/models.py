@@ -41,6 +41,25 @@ class Choice(Enum):
 
 
 @dataclass
+class Event:
+    id: str
+    schema_version: int
+    occurred_at: str
+    source: str
+    repo: str
+    member: str
+    rule_id: str
+    severity: str
+    action: str
+    command_summary: str
+    branch: str
+    pr_number: int | None = None
+    explanation: str = ""
+    llm_used: bool = False
+    related_event_id: str | None = None
+
+
+@dataclass
 class ViolationSnapshot:
     """가이드 시작 시점에 얼려 둔 위반 정보. 가이드 진행 중 context가 바뀌어도
     (예: R01 가이드 중 switch -c로 브랜치가 바뀜) 이 값은 그대로 유지한다."""
@@ -50,6 +69,8 @@ class ViolationSnapshot:
     branch: str
     guide_id: str
     facts: dict
+    event_id: str = ""
+    command_summary: str = ""
 
 
 @dataclass
