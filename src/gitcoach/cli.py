@@ -17,6 +17,7 @@ _SAMPLE_VIOLATIONS: dict[str, tuple[str, dict]] = {
     ),
     "R02": ("force push", {"push_branch": "main", "remote": "origin"}),
     "R03": ("비밀 정보 staged", {"files": [".env"]}),
+    "R04": ("보호된 브랜치(main) 직접 커밋", {"branch": "main"}),
 }
 
 
