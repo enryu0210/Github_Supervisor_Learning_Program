@@ -37,7 +37,10 @@ export type EventAction = (typeof EVENT_ACTIONS)[number];
 export const VIOLATION_ACTIONS = ["allowed", "guided", "blocked", "detected"] as const satisfies readonly EventAction[];
 export type ViolationAction = (typeof VIOLATION_ACTIONS)[number];
 
-/** 가이드의 후속 결과. related_event_id가 채워지는 이벤트. */
+/**
+ * 가이드 결과 이벤트. related_event_id 로 원래 guided 이벤트를 가리킨다.
+ * (복구 guided 도 related_event_id 가 채워지므로 related_event_id 만으로 결과 이벤트를 판단하지 않는다)
+ */
 export const GUIDE_RESULT_ACTIONS = ["guide_completed", "guide_stopped"] as const satisfies readonly EventAction[];
 export type GuideResultAction = (typeof GUIDE_RESULT_ACTIONS)[number];
 

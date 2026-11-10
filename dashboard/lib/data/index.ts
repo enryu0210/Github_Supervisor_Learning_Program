@@ -40,6 +40,8 @@ export type EventFilter = {
   severities?: Severity[];
   actions?: EventAction[];
   repo?: string;
+  /** 검색어. command_summary·branch·PR 번호에 들어 있는지 (대소문자 무시) */
+  query?: string;
 };
 
 /* ------------------------------------------------------------------ */
@@ -48,12 +50,14 @@ export type EventFilter = {
 
 /**
  * 규칙별 위반 집계 ( / 개요의 규칙별 위반 비율, /me 의 자주 틀린 규칙 TOP ).
- * 위반 수는 VIOLATION_ACTIONS(allowed·guided·blocked·detected)만 센다.
+ * 위반 수는 isViolation() 기준: allowed·guided·blocked·detected 를 세되,
+ * 복구 가이드(guided + related_event_id 있음, `gitcoach guide undo`)는 빼고 센다.
+ * DB RPC도 같은 기준이다(01_cli.md 6절, 11/9 확인).
  */
 export type RuleStat = {
   rule_id: RuleId;
   severity: Severity;
-  violation_count: number; // allowed + guided + blocked + detected
+  violation_count: number; // allowed + guided(복구 제외) + blocked + detected
   allowed_count: number; // 알면서도 실행
   guided_count: number;
   blocked_count: number;
@@ -64,6 +68,8 @@ export type RuleStat = {
 /**
  * 가이드 학습 지표 (가이드 완료율).
  * completed·stopped는 related_event_id로 원래 guided 이벤트와 연결해 센다.
+ * 분모(guided)에는 복구 가이드도 포함한다(11/9 이남주 제안·합의).
+ * 한 guided에 결과가 여러 개 붙으면 completed가 하나라도 있으면 완료로 센다.
  */
 export type GuideStat = {
   rule_id: RuleId;
@@ -79,7 +85,18 @@ export type MemberActivity = {
   member: string; // github_login
   prs_opened: number;
   prs_merged: number;
+  /**
+   * 기간 안에 리뷰한 PR 수 (pr_reviews 기준, submitted_at KST).
+   * - 같은 PR에 여러 번 리뷰해도 1로 센다
+   * - PR 작성자 본인의 리뷰는 세지 않는다
+   */
   reviews_given: number;
+  violation_count: number;
+};
+
+/** 일별 위반 수 ( / 개요의 일별 추이 ). date 는 KST 날짜 "YYYY-MM-DD". 위반 수 기준은 RuleStat 과 같다. */
+export type DailyCount = {
+  date: string;
   violation_count: number;
 };
 
@@ -136,6 +153,9 @@ export interface DataSource {
   /** 가이드 완료율 등 학습 지표. */
   getGuideStats(filter?: EventFilter): Promise<GuideStat[]>;
 
+  /** 일별 위반 수. filter.range 가 있으면 빈 날도 0으로 채운다. */
+  getDailyTrend(filter?: EventFilter): Promise<DailyCount[]>;
+
   /** 멤버별 PR·리뷰·위반 분포. */
   getMemberActivity(range: Range): Promise<MemberActivity[]>;
 
@@ -149,13 +169,16 @@ export interface DataSource {
   getQuizAttempts(member: string): Promise<QuizAttempt[]>;
 }
 
+/* ------------------------------------------------------------------ */
+/* 구현체 선택 — 화면은 `import { data } from "@/lib/data"` 만 쓴다       */
+/* ------------------------------------------------------------------ */
+
+import { mockSource } from "./mock";
+
 /*
- * 구현체 선택은 구현체를 추가할 때 이 아래에 둔다. 예:
- *
- *   import { mockSource } from "./mock";
- *   import { supabaseSource } from "./supabase";
+ * 11/19~20 supabaseSource 를 추가하면 아래처럼 바꾼다.
  *   export const data: DataSource =
  *     process.env.NEXT_PUBLIC_DATA_SOURCE === "supabase" ? supabaseSource : mockSource;
- *
  * supabaseSource는 anon 키와 로그인 사용자 토큰만 쓴다. service_role 키는 절대 넣지 않는다.
  */
+export const data: DataSource = mockSource;

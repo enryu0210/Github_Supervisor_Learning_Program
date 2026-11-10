@@ -22,6 +22,15 @@ npm run typecheck  # TypeScript 타입 체크
 npm run build      # 프로덕션 빌드
 ```
 
+## mock 데이터
+
+v0.1은 레포 맨 위 `samples/*.json`(스키마 v1 더미)을 `lib/data/mock/sample-events.json` 한 파일로 합쳐 씁니다.
+대시보드는 `dashboard/` 안에서만 빌드되기 때문에(Docker 포함) 바깥 폴더를 직접 읽지 않고 복사해 둡니다.
+
+```bash
+npm run samples:sync   # samples/ 가 바뀌면 다시 실행하고 결과 파일을 커밋
+```
+
 ## 폴더
 
 | 경로 | 내용 |
