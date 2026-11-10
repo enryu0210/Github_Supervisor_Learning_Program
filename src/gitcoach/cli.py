@@ -1,6 +1,8 @@
 import typer
+from rich.console import Console
+from rich.table import Table
 
-from gitcoach import __version__, guide, shim
+from gitcoach import __version__, events, guide, shim
 
 app = typer.Typer()
 guide_app = typer.Typer()
@@ -46,6 +48,17 @@ def skip() -> None:
 @guide_app.command()
 def stop() -> None:
     typer.echo(guide.stop())
+
+
+@app.command()
+def log(today: bool = typer.Option(False, "--today")) -> None:
+    rows = events.query(today=today)
+    table = Table()
+    for col in ("occurred_at", "rule_id", "action", "command_summary", "branch"):
+        table.add_column(col)
+    for e in rows:
+        table.add_row(e.occurred_at, e.rule_id, e.action, e.command_summary, e.branch)
+    Console().print(table)
 
 
 if __name__ == "__main__":
