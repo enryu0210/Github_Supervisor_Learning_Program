@@ -1,6 +1,6 @@
 import subprocess
 
-from gitcoach import rules, shim, ui
+from gitcoach import events, rules, shim, ui
 from gitcoach.models import Choice, Violation
 
 
@@ -62,9 +62,9 @@ def _init_repo() -> None:
     subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], check=True)
 
 
-def _violation(allow_run=True) -> Violation:
+def _violation(rule_id="R01", allow_run=True) -> Violation:
     return Violation(
-        rule_id="R01",
+        rule_id=rule_id,
         title="t",
         severity="high",
         facts={},
@@ -73,6 +73,10 @@ def _violation(allow_run=True) -> Violation:
         warning="w",
         consequence="c",
     )
+
+
+def _use_tmp_db(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(events, "DB_PATH", tmp_path / "events.db")
 
 
 def test_run_interactive_no_violations_execs_git(tmp_path, monkeypatch) -> None:
@@ -86,26 +90,39 @@ def test_run_interactive_no_violations_execs_git(tmp_path, monkeypatch) -> None:
 def test_run_interactive_run_choice_execs_git(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation()])
     monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.RUN)
     assert shim.run(["status"]) == 0
+    rows = events.query()
+    assert len(rows) == 1
+    assert rows[0].action == "allowed"
+    assert rows[0].rule_id == "R01"
 
 
 def test_run_interactive_cancel_choice_blocks(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr(
-        rules, "evaluate", lambda cmd, ctx: [_violation(allow_run=False)]
+        rules,
+        "evaluate",
+        lambda cmd, ctx: [_violation(), _violation(rule_id="R03", allow_run=False)],
     )
     monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.CANCEL)
     assert shim.run(["status"]) == 1
+    rows = events.query()
+    assert len(rows) == 1
+    assert rows[0].action == "blocked"
+    assert rows[0].rule_id == "R03"
 
 
 def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation()])
     monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.GUIDE)
@@ -113,3 +130,6 @@ def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) 
     monkeypatch.setattr(ui, "print_cancelled", lambda: printed.append(True))
     assert shim.run(["status"]) == 1
     assert printed == [True]
+    rows = events.query()
+    assert len(rows) == 1
+    assert rows[0].action == "guided"
