@@ -1,14 +1,6 @@
-import re
-
 from gitcoach.commit_format import is_valid_commit_message
 from gitcoach.models import Command, Context, GuideStep, Scenario, ViolationSnapshot
-
-_AREA = "cli|watcher|web|db|infra|docs"
-_BRANCH_RE = re.compile(rf"^(feature|fix)/({_AREA})-[a-z0-9-]+$")
-
-
-def _is_valid_branch_name(name: str) -> bool:
-    return bool(_BRANCH_RE.match(name))
+from gitcoach.rules.r05_branch_naming import is_valid_branch_name
 
 
 def _r01_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
@@ -18,7 +10,7 @@ def _r01_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
         return False
     if not cmd.positionals:
         return False
-    return _is_valid_branch_name(cmd.positionals[-1])
+    return is_valid_branch_name(cmd.positionals[-1])
 
 
 def _r01_step2(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
@@ -160,9 +152,63 @@ _R04 = Scenario(
 )
 
 
+def _r05_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
+    if cmd.subcommand not in ("switch", "checkout"):
+        return False
+    if not ({"-c", "-C", "-b", "-B"} & set(cmd.flags)):
+        return False
+    if not cmd.positionals:
+        return False
+    return cmd.positionals[-1] == snap.facts.get("suggestion")
+
+
+_R05 = Scenario(
+    guide_id="r05_branch_naming",
+    title="규칙에 맞는 브랜치명 쓰기",
+    summary="제안받은 이름으로 브랜치를 다시 만든다",
+    steps=[
+        GuideStep(
+            instruction="위 경고에 나온 제안 이름으로 브랜치를 다시 만드세요.",
+            hint="git switch -c <제안 이름> (경고 화면에 나온 이름을 그대로 쓰세요)",
+            answer="git switch -c feature/cli-mybranch",
+            expect=_r05_step1,
+        ),
+    ],
+)
+
+
+def _r06_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
+    if cmd.subcommand != "commit":
+        return False
+    if cmd.message is None:
+        return False
+    return is_valid_commit_message(cmd.message)
+
+
+_R06 = Scenario(
+    guide_id="r06_commit_message",
+    title="커밋 메시지 형식 맞추기",
+    summary="type(scope): 설명 형식으로 커밋 메시지를 맞춘다",
+    steps=[
+        GuideStep(
+            instruction="커밋 메시지를 형식에 맞게 다시 쓰세요.",
+            hint=(
+                'git commit -m "type(scope): 설명" '
+                "(type: feat·fix·docs·test·chore·ci·refactor, "
+                "scope: cli·watcher·web·db·infra·docs)"
+            ),
+            answer='git commit -m "fix(cli): 설명"',
+            expect=_r06_step1,
+        ),
+    ],
+)
+
+
 SCENARIOS: dict[str, Scenario] = {
     _R01.guide_id: _R01,
     _R02.guide_id: _R02,
     _R03.guide_id: _R03,
     _R04.guide_id: _R04,
+    _R05.guide_id: _R05,
+    _R06.guide_id: _R06,
 }

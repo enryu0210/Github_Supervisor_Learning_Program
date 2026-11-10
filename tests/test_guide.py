@@ -320,6 +320,37 @@ def test_r04_step2_accepts_correctly_formatted_commit_message(
     assert good.action is GuideAction.EXEC_AND_ADVANCE
 
 
+def test_r05_step1_requires_the_suggested_name(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    guide.start(
+        [
+            _violation(
+                rule_id="R05",
+                guide_id="r05_branch_naming",
+                facts={"branch_name": "MyBranch", "suggestion": "feature/cli-mybranch"},
+            )
+        ],
+        _ctx(),
+    )
+    wrong_name = guide.on_command(["switch", "-c", "feature/cli-other"])
+    assert wrong_name.action is GuideAction.FALLTHROUGH
+
+    right_name = guide.on_command(["switch", "-c", "feature/cli-mybranch"])
+    assert right_name.action is GuideAction.EXEC_AND_ADVANCE
+
+
+def test_r06_step1_requires_valid_commit_message_format(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    guide.start([_violation(rule_id="R06", guide_id="r06_commit_message")], _ctx())
+    bad = guide.on_command(["commit", "-m", "bad message"])
+    assert bad.action is GuideAction.FALLTHROUGH
+
+    good = guide.on_command(["commit", "-m", "fix(cli): bad message"])
+    assert good.action is GuideAction.EXEC_AND_ADVANCE
+
+
 def test_start_message_includes_explanation_before_guide_header(
     tmp_path, monkeypatch
 ) -> None:
