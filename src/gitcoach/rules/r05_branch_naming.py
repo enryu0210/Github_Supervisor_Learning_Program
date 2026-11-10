@@ -62,7 +62,8 @@ def _creating_branch_name(cmd: Command) -> str | None:
     if cmd.subcommand in ("checkout", "switch"):
         if not (_CREATE_FLAGS & set(cmd.flags)):
             return None
-        return cmd.positionals[-1] if cmd.positionals else None
+        # `checkout -b <새 이름> [시작점]`: 마지막 인자는 시작점일 수 있어 첫 인자를 본다
+        return cmd.positionals[0] if cmd.positionals else None
     if cmd.subcommand == "branch":
         if _BRANCH_SKIP_FLAGS & set(cmd.flags):
             return None

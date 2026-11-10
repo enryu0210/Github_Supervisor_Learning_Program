@@ -96,3 +96,12 @@ def test_branch_create_with_invalid_name_is_violation() -> None:
     v = check_branch_naming(cmd, _ctx())
     assert v is not None
     assert v.rule_id == "R05"
+
+
+def test_checkout_dash_b_with_start_point_checks_new_name_only() -> None:
+    cmd = Command(
+        subcommand="checkout",
+        flags=["-b"],
+        positionals=["feature/cli-x", "origin/develop"],
+    )
+    assert check_branch_naming(cmd, _ctx()) is None

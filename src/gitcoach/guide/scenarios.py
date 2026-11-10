@@ -10,7 +10,8 @@ def _r01_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
         return False
     if not cmd.positionals:
         return False
-    return is_valid_branch_name(cmd.positionals[-1])
+    # `checkout -b <새 이름> [시작점]`: 새 브랜치명은 항상 첫 인자다
+    return is_valid_branch_name(cmd.positionals[0])
 
 
 def _r01_step2(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
@@ -159,7 +160,7 @@ def _r05_step1(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
         return False
     if not cmd.positionals:
         return False
-    return cmd.positionals[-1] == snap.facts.get("suggestion")
+    return cmd.positionals[0] == snap.facts.get("suggestion")
 
 
 _R05 = Scenario(

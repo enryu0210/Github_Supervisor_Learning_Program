@@ -340,6 +340,25 @@ def test_r05_step1_requires_the_suggested_name(tmp_path, monkeypatch) -> None:
     assert right_name.action is GuideAction.EXEC_AND_ADVANCE
 
 
+def test_r05_step1_with_start_point_checks_new_name_only(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    guide.start(
+        [
+            _violation(
+                rule_id="R05",
+                guide_id="r05_branch_naming",
+                facts={"branch_name": "MyBranch", "suggestion": "feature/cli-mybranch"},
+            )
+        ],
+        _ctx(),
+    )
+    right_name_with_start_point = guide.on_command(
+        ["switch", "-c", "feature/cli-mybranch", "origin/develop"]
+    )
+    assert right_name_with_start_point.action is GuideAction.EXEC_AND_ADVANCE
+
+
 def test_r06_step1_requires_valid_commit_message_format(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
