@@ -62,7 +62,7 @@
 5. 위반이 없으면 진짜 git을 바로 실행한다. 기록도 남기지 않는다.
 6. 위반이 있으면 **심각한 순서대로 모두** 보여 준다(규칙명 + 한 줄 경고 + "그냥 실행하면:" 한 줄, 모두 템플릿). 선택은 명령 하나에 한 번 받는다. Enter는 [2].
 7. [1]이면 git을 실행하고 위반마다 `allowed` 기록 → "되돌리려면" 안내. [2]면 원래 명령을 취소하고 위반마다 `guided` 기록 → 설명(Ollama, 실패 시 템플릿) → **가장 심각한 규칙부터 차례로** 가이드(하나가 끝나면 다음 가이드 시작).
-8. 위반 중에 R03이 있으면 [1] 대신 [q] 취소만 있다. 취소하면 `blocked` 기록.
+8. 위반 중에 R03이 있으면 [1] 대신 [q] 취소만 있다. 취소하면 **R03의 `blocked` 1건만** 기록하고, 함께 걸린 다른 위반(예: R01)은 기록하지 않는다(#12 확정, #15 머지 때 문서에 빠졌던 부분 11/10 보강).
 
 "터미널"의 판단: 사용자가 키보드로 답할 수 있는가(stdin이 tty인가)로 본다. `git log | grep`처럼 출력만 파이프로 넘기는 경우는 키보드 입력이 살아 있으므로 터미널로 본다. IDE·GitHub Desktop의 Git 버튼은 애초에 쉘 함수를 거치지 않으므로 검사 대상이 아니며, watcher가 GitHub 쪽에서 보완한다.
 
@@ -234,7 +234,7 @@ git-coach/
 8. `feature/cli-explain-ollama` — LLM 설명, 템플릿 폴백, 캐시
 9. `feature/cli-rule-direct-commit`(R04), `feature/cli-rule-naming`(R05·R06) — 규칙 로직과 함께 각 가이드 시나리오(3-3 표)도 이 PR에서 추가(11/9 확정)
 10. `feature/cli-config` — `config.py`(설정 병합, 보호 브랜치) + `gitcoach config` 커맨드. `context.py`가 하드코딩 대신 이 모듈을 읽도록 교체
-11. `feature/cli-sync` — 팀 토큰(`config.py`) + Edge Function `ingest-events` 호출로 `gitcoach sync` 실구현(stub 교체). 팀 토큰은 `~/.gitcoach/config.toml`에 평문 저장(11/9 확정, 홈 디렉터리라 레포 커밋 대상 아님, 화면·로그에 값 노출 금지)
+11. `feature/cli-sync` — Edge Function `ingest-events` 호출로 `gitcoach sync` 실구현(stub 교체). 팀 토큰·엔드포인트는 `config.py`가 아니라 환경변수 `GITCOACH_SYNC_TOKEN`·`GITCOACH_SYNC_URL`로 받는다(3-7 사양 기준, 11/10 정정 — 이전의 "config.toml 평문 저장" 문구는 3-7의 "config.toml엔 팀 공용 인프라 값을 안 둔다"는 원칙과 충돌해서 폐기)
 12. `feature/cli-init-doctor` — `gitcoach init`(쉘 래퍼 설치·Ollama 연결 확인·설정 파일 생성, member 자동 감지) + `gitcoach uninstall`(래퍼 제거) + `gitcoach doctor`(상태 점검)
 13. (P2) `feature/cli-irreversible-confirm`(추가 확인), `feature/cli-severity-context`(상황별 심각도)
 14. (v0.2) `feature/cli-rule-destructive`(R07)
@@ -301,28 +301,32 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | `guide_stopped` | 가이드를 중간에 그만둠 |
 | `detected` | watcher가 GitHub에서 발견 |
 
-- `id`: `uuid5(namespace=events.py에 고정한 UUID 리터럴, name=f"{rule_id}\x1f{repo.lower()}\x1f{entity}")`(`\x1f`는 브랜치명에 못 들어가는 구분자). CLI 이벤트는 규칙별 대상을 `entity`로 쓴다(R05=브랜치명 그대로, R06=커밋 SHA 전체(40자), PR 관련=`pr:{번호}`, 상세는 `events.py` 구현, 11/9 확정). watcher `detected`도 같은 공식을 재사용하는 안을 제안했다(**D1, 미정** — 이남주 확인 필요). 같은 위반을 반복 감지해도 `entity`가 같으면 id가 같아져 `on conflict (id) do nothing`으로 중복이 걸러질 것으로 예상. 제안하는 규칙별 `entity`:
+- `id`: **CLI(`source=cli`)와 watcher(`source=github`, `detected`만)가 서로 다른 방식을 쓴다(11/10 확정, 임지윤·이남주 동의).**
+  - **CLI**: 이벤트를 기록하는 시점에 `uuid4()`로 1회 생성해 로컬 SQLite에 그대로 저장한다. CLI는 "명령 한 번 = 이벤트 한 번"이 원칙이라 같은 위반을 다시 저질러도 별개 사건으로 센다 — entity·action 기반 멱등 id(`uuid5`)를 쓰면 같은 커밋으로 재시도하는 경우처럼 실제로는 다른 사건인데도 같은 id가 나와 `on conflict (id) do nothing`에 조용히 사라지는 문제가 있어서 제외했다. `sync` 재전송 시에도 로컬에 저장해 둔 같은 id를 그대로 보내므로 서버 쪽 중복 방지는 그대로 유지된다. (샘플 이벤트 JSON, PR #19도 이 방식으로 교체 필요 — 임지윤 확인)
+  - **watcher**: `uuid5(namespace=events.py에 고정한 UUID 리터럴, name=f"{rule_id}\x1f{repo.lower()}\x1f{entity}")`(`\x1f`는 브랜치명에 못 들어가는 구분자). watcher는 같은 사건을 주기적 조회로 반복 감지할 수 있어 이 멱등 id가 필요하다(D1 해결 — 이남주 확인 완료). 규칙별 `entity`:
 
-  | 규칙 | entity(제안) |
-  |---|---|
-  | R01 (main 직접 push) | push된 커밋 SHA |
-  | R02 (force push) | `f"{branch}:{new_head_sha}"` |
-  | R05 (브랜치명 규칙 위반) | 브랜치명 |
-  | R06 (커밋 메시지 규칙 위반) | 커밋 SHA |
-  | R08 (PR 대상 브랜치 오류) | PR 번호 |
+    | 규칙 | entity |
+    |---|---|
+    | R01 (main 직접 push) | push 후 해당 브랜치의 head SHA (커밋이 여러 개인 push도 1건으로 묶기 위함, 이남주 확인) |
+    | R02 (force push) | `f"{branch}:{new_head_sha}"` |
+    | R05 (브랜치명 규칙 위반) | 브랜치명 |
+    | R06 (커밋 메시지 규칙 위반) | 커밋 SHA |
+    | R08 (PR 대상 브랜치 오류) | `f"pr:{번호}"` (이남주 확인, 포맷 통일) |
 
-  방치 PR·리뷰 쏠림은 rule_id 자체가 D2 확정 전까지 없으므로 `entity`도 D2 확정 후 추가한다.
-- `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null.
-- `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다. **구현 시 주의**: 이 값은 현재 context를 다시 읽어서 채우면 안 되고, 가이드 시작 시 저장해 둔 원래 `guided` 이벤트 값을 그대로 복사한다(예: R01 가이드 중 `git switch -c feature/...`로 브랜치가 실제로 바뀌므로, 그때 context를 다시 읽으면 `branch`가 달라져 점검 쿼리에 걸린다. `guide/state.py`에 원래 값을 들고 있어야 함, 11/9 확인).
+    방치 PR·리뷰 쏠림은 rule_id 자체가 D2 확정 전까지 없으므로 `entity`도 D2 확정 후 추가한다.
+- `related_event_id`: `guide_completed`·`guide_stopped`가 원래 `guided` 이벤트의 id를 가리킨다. `guide undo`로 시작한 복구 가이드의 `guided` 이벤트는 원래 `allowed` 이벤트의 id를 가리킨다. 나머지는 null. **구현 메모**: CLI의 `id`는 사후에 다시 계산할 수 없으므로(uuid4라 entity로 재현 불가), 가이드를 시작할 때 원래 `guided` 이벤트의 id를 `.git/gitcoach/guide.json`(`ViolationSnapshot`)에 함께 저장해 둬야 한다(11/10 확인, 이남주 요청).
+- `guide_completed`·`guide_stopped`의 `rule_id`·`severity`·`repo`·`member`·`branch`·`command_summary`는 가리키는 `guided` 이벤트와 동일한 값을 쓴다(`command_summary`도 복사 — 11/10 확정, 임지윤 확인: #19 샘플과 일치하고 타임라인에서 "가이드 완료 · git push origin main"처럼 어떤 명령에서 시작했는지 바로 보임. 가이드 연결은 `related_event_id`로 충분하므로 별도 식별 문자열은 쓰지 않음). **구현 시 주의**: 이 값들은 현재 context를 다시 읽어서 채우면 안 되고, 가이드 시작 시 저장해 둔 원래 `guided` 이벤트 값을 그대로 복사한다(예: R01 가이드 중 `git switch -c feature/...`로 브랜치가 실제로 바뀌므로, 그때 context를 다시 읽으면 `branch`가 달라져 점검 쿼리에 걸린다. `guide/state.py`에 원래 값을 들고 있어야 함, 11/9 확인).
 - `guide skip`은 별도 action을 만들지 않고 `guide_stopped`로 기록한다.
 - `blocked`는 R03(실행 불가 규칙) 취소에만 쓴다. 다른 규칙에서 Ctrl+C 등으로 중단하는 경우는 이벤트를 남기지 않는다.
-- 다중 위반이면 위반마다 이벤트 1건씩 남긴다(같은 `command_summary`).
+- 다중 위반이면 위반마다 이벤트 1건씩 남긴다(같은 `command_summary`). **단, R03이 포함된 다중 위반에서 [q]로 취소한 경우는 예외** — R03의 `blocked` 1건만 남기고 나머지 위반은 기록하지 않는다(3-2 8번 참고, #12 확정).
 - 위반 수 집계 시 `guided`에 `related_event_id`가 있는 것(= `guide undo` 복구 가이드)은 위반으로 세지 않는다. 대시보드·DB RPC도 같은 기준을 쓴다(11/9 확인).
 - `source`는 `cli` 또는 `github`. 두 경우 모두 같은 스키마.
 - v1은 11/5 확정 후 임지윤·이남주에게 통보했다. 이후 필드 추가·변경은 PR을 올리고 CLI·웹·DB 담당 3명이 모두 승인한다. ERD의 `events.action` 설명도 함께 바꾼다.
 - 시크릿 값은 어떤 필드에도 넣지 않는다.
 - 활용: 대시보드는 "위반 후 가이드를 끝까지 한 비율"을 학습 지표로, 퀴즈는 `allowed`·`guide_stopped`를 우선 출제 근거로 쓴다.
-- 11/9 v1 고정.
+- 이벤트 로컬 저장 위치는 레포별이 아니라 **사용자 전역** `~/.gitcoach/events.db`(`config.toml`과 동일한 위치, 11/10 확정, 이남주 확인 — DB 쪽 영향 없음). 학생이 git 사고로 레포를 지우고 다시 clone해도 이벤트 기록이 남도록 하기 위함.
+- **[참고, 11/17~19 임지윤과 정리]** R01·R05·R06은 CLI(`guided`/`allowed`)와 watcher(`detected`)가 같은 사건을 각자 따로 잡을 수 있어 위반 통계에 중복 집계될 수 있다. `source` 필터로 구분할지는 watcher 착수 때 정한다(이남주 지적).
+- 11/9 v1 고정, 11/10 id 공식(CLI=uuid4/watcher=uuid5 분리)·`command_summary` 복사·저장 위치·R03 다중위반 예외 보강(임지윤·이남주 확인 완료).
 
 ## 7. 주고받는 것
 | 상대 | 내가 받는 것 | 내가 주는 것 | 기한 |
