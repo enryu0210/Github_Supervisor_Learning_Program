@@ -2,10 +2,13 @@
 // 이벤트 값 → 화면 표시 문구. 화면에서 문구를 직접 쓰지 말고 여기서 가져온다.
 // Record<EventAction, ...> 형태라서 types/event.ts에 값이 추가되면 여기서 컴파일 오류가 나 빠뜨릴 수 없다.
 
-import type { EventAction, EventSource, RuleId, Severity } from "@/types/event";
+import type { EventAction, EventSource, GitCoachEvent, RuleId, Severity } from "@/types/event";
 
-/** 배지 색 의미. 실제 색(Tailwind 클래스 등)은 UI 컴포넌트에서 이 값에 매핑한다. */
-export type LabelTone = "danger" | "warning" | "info" | "success" | "neutral";
+/**
+ * 배지 색 의미. 실제 색(Tailwind 클래스)은 components/Badge.tsx 에서 매핑한다.
+ * notice 는 "GitHub에서 발견" 전용 색 (docs/wireframes/README.md)
+ */
+export type LabelTone = "danger" | "warning" | "info" | "success" | "neutral" | "notice";
 
 export type LabelInfo = {
   label: string; // 배지·표에 쓰는 짧은 문구
@@ -46,8 +49,15 @@ export const ACTION_LABELS: Record<EventAction, LabelInfo> = {
   detected: {
     label: "GitHub에서 발견",
     description: "watcher가 GitHub 활동에서 규칙 위반을 찾았어요.",
-    tone: "warning",
+    tone: "notice",
   },
+};
+
+/** `gitcoach guide undo` 로 시작한 복구 가이드 (guided + related_event_id → 원래 allowed) */
+const RECOVERY_GUIDE_LABEL: LabelInfo = {
+  label: "복구 가이드 시작",
+  description: "그냥 실행한 명령을 되돌리는 복구 가이드를 시작했어요.",
+  tone: "info",
 };
 
 /* ------------------------------------------------------------------ */
@@ -89,6 +99,7 @@ export const RULE_NAMES: Record<string, string> = {
   R05: "브랜치명 규칙 위반",
   R06: "커밋 메시지 규칙 위반",
   R07: "되돌리기 어려운 명령", // v0.2
+  R08: "PR 대상 브랜치 오류", // watcher 전용 (feature → main, develop 이어야 함)
 };
 
 /* ------------------------------------------------------------------ */
@@ -101,6 +112,12 @@ function fallback(raw: string): LabelInfo {
 
 export function actionLabel(action: EventAction | string): LabelInfo {
   return (ACTION_LABELS as Record<string, LabelInfo>)[action] ?? fallback(action);
+}
+
+/** 이벤트 하나의 action 문구. 복구 가이드는 일반 guided 와 다르게 보여 준다. */
+export function eventActionLabel(e: Pick<GitCoachEvent, "action" | "related_event_id">): LabelInfo {
+  if (e.action === "guided" && e.related_event_id !== null) return RECOVERY_GUIDE_LABEL;
+  return actionLabel(e.action);
 }
 
 export function severityLabel(severity: Severity | string): LabelInfo {
