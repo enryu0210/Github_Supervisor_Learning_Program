@@ -1,4 +1,4 @@
-from gitcoach import context, events, parser
+from gitcoach import context, events, explain, parser
 from gitcoach.guide import matcher, state
 from gitcoach.guide.scenarios import SCENARIOS
 from gitcoach.models import (
@@ -29,6 +29,7 @@ def start(
             branch=ctx.current_branch,
             guide_id=v.guide_id,
             facts=v.facts,
+            title=v.title,
             event_id=ev.id if ev else None,
             command_summary=command_summary,
         )
@@ -40,11 +41,8 @@ def start(
 
 
 def start_message(guide_state: GuideState, command_summary: str) -> str:
-    scenario = SCENARIOS[guide_state.queue[0].guide_id]
-    step = scenario.steps[0]
-    header = f"📘 가이드 시작: {scenario.title} (총 {len(scenario.steps)}단계)"
     cancelled = f"   원래 명령({command_summary})은 취소했어요."
-    return f"{header}\n{cancelled}\n{_format_step(scenario, guide_state, step)}"
+    return f"{cancelled}\n{_start_next(guide_state)}"
 
 
 def current_prompt() -> str:
@@ -140,13 +138,7 @@ def _stop_current(*, advance_queue: bool) -> str:
         return "가이드를 중단했어요."
 
     state.save(guide_state)
-    next_scenario = SCENARIOS[guide_state.queue[0].guide_id]
-    next_step = next_scenario.steps[0]
-    return (
-        "이번 가이드는 건너뛰었어요. "
-        f"다음 가이드를 시작해요: {next_scenario.title}\n"
-        f"{_format_step(next_scenario, guide_state, next_step)}"
-    )
+    return f"이번 가이드는 건너뛰었어요.\n{_start_next(guide_state)}"
 
 
 def _advance(guide_state: GuideState, scenario: Scenario) -> str:
@@ -180,11 +172,24 @@ def _advance(guide_state: GuideState, scenario: Scenario) -> str:
         return summary
 
     state.save(guide_state)
-    next_scenario = SCENARIOS[guide_state.queue[0].guide_id]
-    next_step = next_scenario.steps[0]
+    return f"{summary}\n{_start_next(guide_state)}"
+
+
+def _start_next(guide_state: GuideState) -> str:
+    """큐의 맨 앞 가이드를 시작한다. explain()은 가이드가 실제로 시작되는 이
+    시점에만 호출한다(다중 위반이어도 한꺼번에 미리 부르지 않음, 01_cli.md 3-6 5번)."""
+    snap = guide_state.queue[0]
+    scenario = SCENARIOS[snap.guide_id]
+    step = scenario.steps[0]
+
+    explanation = explain.explain(snap.rule_id, snap.title, snap.facts)
+    if snap.event_id is not None:
+        events.update_explanation(snap.event_id, explanation.text, explanation.llm_used)
+
+    header = f"📘 가이드 시작: {scenario.title} (총 {len(scenario.steps)}단계)"
     return (
-        f"{summary}\n📘 가이드 시작: {next_scenario.title}\n"
-        f"{_format_step(next_scenario, guide_state, next_step)}"
+        f"💡 왜 문제일까요?\n   {explanation.text}\n\n"
+        f"{header}\n{_format_step(scenario, guide_state, step)}"
     )
 
 

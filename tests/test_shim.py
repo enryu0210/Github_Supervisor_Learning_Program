@@ -1,7 +1,7 @@
 import subprocess
 
-from gitcoach import events, rules, shim, ui
-from gitcoach.models import Choice, Violation
+from gitcoach import events, explain, rules, shim, ui
+from gitcoach.models import Choice, Explanation, Violation
 
 
 def test_is_interactive_true(monkeypatch) -> None:
@@ -126,6 +126,9 @@ def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) 
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation()])
     monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.GUIDE)
+    monkeypatch.setattr(
+        explain, "explain", lambda rule_id, title, facts: Explanation("설명", False)
+    )
     printed = []
     monkeypatch.setattr(ui, "print_cancelled", lambda: printed.append(True))
     assert shim.run(["status"]) == 1
@@ -133,3 +136,4 @@ def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) 
     rows = events.query()
     assert len(rows) == 1
     assert rows[0].action == "guided"
+    assert rows[0].explanation == "설명"

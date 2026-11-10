@@ -71,6 +71,13 @@ class ViolationSnapshot:
     facts: dict
     event_id: str | None = None
     command_summary: str = ""
+    title: str = ""
+
+
+@dataclass
+class Explanation:
+    text: str
+    llm_used: bool
 
 
 @dataclass
