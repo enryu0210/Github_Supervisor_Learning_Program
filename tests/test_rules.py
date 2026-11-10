@@ -45,3 +45,12 @@ def test_evaluate_sorts_by_severity(monkeypatch) -> None:
         Command(subcommand="push", flags=[], positionals=[]), _ctx()
     )
     assert [v.rule_id for v in result] == ["RY", "RX"]
+
+
+def test_commit_on_main_with_bad_message_triggers_r04_and_r06_in_severity_order() -> (
+    None
+):
+    cmd = Command(subcommand="commit", flags=["-m"], positionals=[], message="fix")
+    result = rules.evaluate(cmd, _ctx())
+    assert [v.rule_id for v in result] == ["R04", "R06"]
+    assert [v.severity for v in result] == ["medium", "low"]
