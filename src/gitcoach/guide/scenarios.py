@@ -1,5 +1,6 @@
 import re
 
+from gitcoach.commit_format import is_valid_commit_message
 from gitcoach.models import Command, Context, GuideStep, Scenario, ViolationSnapshot
 
 _AREA = "cli|watcher|web|db|infra|docs"
@@ -130,8 +131,38 @@ _R03 = Scenario(
 )
 
 
+def _r04_step2(cmd: Command, ctx: Context, snap: ViolationSnapshot) -> bool:
+    if cmd.subcommand != "commit":
+        return False
+    if cmd.message is None:
+        return False
+    return is_valid_commit_message(cmd.message)
+
+
+_R04 = Scenario(
+    guide_id="r04_direct_commit",
+    title="커밋을 feature 브랜치에서 하기",
+    summary="main에는 직접 커밋하지 않고, feature 브랜치로 옮겨서 커밋한다",
+    steps=[
+        GuideStep(
+            instruction="지금 변경을 가진 새 브랜치를 만드세요.",
+            hint="git switch -c feature/<영역>-<설명> 형식으로 만드세요",
+            answer="git switch -c feature/cli-login-fix",
+            expect=_r01_step1,
+        ),
+        GuideStep(
+            instruction="이제 feature 브랜치에서 커밋하세요.",
+            hint='git commit -m "type(scope): 설명" (type: feat·fix·docs·test·chore·ci·refactor)',
+            answer='git commit -m "feat(cli): 설명"',
+            expect=_r04_step2,
+        ),
+    ],
+)
+
+
 SCENARIOS: dict[str, Scenario] = {
     _R01.guide_id: _R01,
     _R02.guide_id: _R02,
     _R03.guide_id: _R03,
+    _R04.guide_id: _R04,
 }
