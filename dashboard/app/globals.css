@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/*
+ * 디자인 규칙: docs/wireframes/README.md "A. 드림핵 스타일"
+ * 색 이름은 Tailwind 클래스로 그대로 쓴다. 예: bg-surface, text-muted, bg-accent, text-high
+ */
+@theme {
+  --color-bg: #f6f6fb;
+  --color-surface: #ffffff;
+  --color-border: #e6e6f0;
+  --color-text: #1d1f2c;
+  --color-muted: #7a7d92;
+  --color-accent: #6b5cf6;
+  --color-accent-soft: #efedff;
+  --color-accent-mid: #b9b1fb;
+  --color-accent-light: #e3dffd;
+
+  /* 상태 색 (배지). lib/labels.ts 의 tone 과 연결 */
+  --color-high: #e5484d;
+  --color-high-bg: #ffefef;
+  --color-medium: #e8890c;
+  --color-medium-bg: #fff4e2;
+  --color-low: #7a7d92;
+  --color-low-bg: #f1f1f5;
+  --color-ok: #1f9d57;
+  --color-ok-bg: #e6f6ed;
+  --color-detected: #b7791f;
+  --color-detected-bg: #fdf6dc;
+
+  --radius-card: 14px;
+  --shadow-card: 0 2px 10px rgba(40, 30, 120, 0.06);
+
+  --font-sans: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
