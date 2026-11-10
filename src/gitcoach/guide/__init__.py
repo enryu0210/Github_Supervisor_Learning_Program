@@ -29,7 +29,7 @@ def start(
             branch=ctx.current_branch,
             guide_id=v.guide_id,
             facts=v.facts,
-            event_id=ev.id if ev else "",
+            event_id=ev.id if ev else None,
             command_summary=command_summary,
         )
         for v, ev in zip(violations, guide_events, strict=True)
@@ -116,16 +116,17 @@ def _stop_current(*, advance_queue: bool) -> str:
     if guide_state is None:
         return _NO_GUIDE
     snap = guide_state.queue[0]
-    events.record(
-        events.make_event(
-            rule_id=snap.rule_id,
-            severity=snap.severity,
-            branch=snap.branch,
-            action="guide_stopped",
-            command_summary=snap.command_summary,
-            related_event_id=snap.event_id,
+    if snap.event_id is not None:
+        events.record(
+            events.make_event(
+                rule_id=snap.rule_id,
+                severity=snap.severity,
+                branch=snap.branch,
+                action="guide_stopped",
+                command_summary=snap.command_summary,
+                related_event_id=snap.event_id,
+            )
         )
-    )
 
     if not advance_queue:
         state.clear()
@@ -158,16 +159,17 @@ def _advance(guide_state: GuideState, scenario: Scenario) -> str:
         return f"✅ 완료! {_format_step(scenario, guide_state, step)}"
 
     snap = guide_state.queue[0]
-    events.record(
-        events.make_event(
-            rule_id=snap.rule_id,
-            severity=snap.severity,
-            branch=snap.branch,
-            action="guide_completed",
-            command_summary=snap.command_summary,
-            related_event_id=snap.event_id,
+    if snap.event_id is not None:
+        events.record(
+            events.make_event(
+                rule_id=snap.rule_id,
+                severity=snap.severity,
+                branch=snap.branch,
+                action="guide_completed",
+                command_summary=snap.command_summary,
+                related_event_id=snap.event_id,
+            )
         )
-    )
     summary = f"✅ 가이드 완료! 배운 점: {scenario.summary}"
     guide_state.queue.pop(0)
     guide_state.step_index = 0

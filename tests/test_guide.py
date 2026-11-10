@@ -216,7 +216,31 @@ def test_skip_moves_to_next_guide_in_queue(tmp_path, monkeypatch) -> None:
     )
     guide.skip()
     assert state.load().queue[0].rule_id == "R02"
-    assert events.query()[0].action == "guide_stopped"
+    assert events.query() == []
+
+
+def test_skip_records_guide_stopped_pointing_at_original_guided_event(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev)
+    guide.start([_violation()], _ctx(), [ev], "git push origin main")
+
+    guide.skip()
+
+    rows = [e for e in events.query() if e.action == "guide_stopped"]
+    assert len(rows) == 1
+    assert rows[0].related_event_id == ev.id
+    assert rows[0].command_summary == "git push origin main"
 
 
 def test_skip_last_guide_clears_state(tmp_path, monkeypatch) -> None:

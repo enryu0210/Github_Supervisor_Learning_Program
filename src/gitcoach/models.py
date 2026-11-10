@@ -54,7 +54,7 @@ class Event:
     command_summary: str
     branch: str
     pr_number: int | None = None
-    explanation: str = ""
+    explanation: str | None = None
     llm_used: bool = False
     related_event_id: str | None = None
 
@@ -69,7 +69,7 @@ class ViolationSnapshot:
     branch: str
     guide_id: str
     facts: dict
-    event_id: str = ""
+    event_id: str | None = None
     command_summary: str = ""
 
 

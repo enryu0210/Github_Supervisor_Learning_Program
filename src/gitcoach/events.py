@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS events (
     command_summary TEXT NOT NULL,
     branch TEXT NOT NULL,
     pr_number INTEGER,
-    explanation TEXT NOT NULL,
+    explanation TEXT,
     llm_used INTEGER NOT NULL,
     related_event_id TEXT
 )
@@ -38,7 +38,7 @@ def make_event(
     action: str,
     command_summary: str,
     pr_number: int | None = None,
-    explanation: str = "",
+    explanation: str | None = None,
     llm_used: bool = False,
     related_event_id: str | None = None,
 ) -> Event:
@@ -143,4 +143,4 @@ def _member() -> str:
         check=False,
     )
     name = result.stdout.strip().lower()
-    return re.sub(r"[^a-z0-9]", "", name)  # TODO(cli-config): github_login으로 교체
+    return re.sub(r"[^a-z0-9-]", "", name)  # TODO(cli-config): github_login으로 교체
