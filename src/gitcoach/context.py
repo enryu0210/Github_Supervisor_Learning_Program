@@ -1,19 +1,20 @@
 import subprocess
 import sys
 
+from gitcoach import config
 from gitcoach.models import Command, Context
-
-_PROTECTED_BRANCHES = ["main"]
 
 
 def collect(cmd: Command) -> Context:
     current_branch = _current_branch()
+    repo_root = config.find_repo_root()
     return Context(
         current_branch=current_branch,
         push_branch=cmd.refspec or current_branch,
         staged_files=_staged_files(),
-        protected_branches=_PROTECTED_BRANCHES,
+        protected_branches=config.protected_branches(repo_root),
         interactive=sys.stdin.isatty(),
+        repo_root=repo_root,
     )
 
 

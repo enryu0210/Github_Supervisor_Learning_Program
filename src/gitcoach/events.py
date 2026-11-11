@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+from gitcoach import config
 from gitcoach.models import Event
 
 DB_PATH = Path.home() / ".gitcoach" / "events.db"
@@ -153,6 +154,10 @@ def _repo() -> str:
 
 
 def _member() -> str:
+    return config.member() or _member_fallback()
+
+
+def _member_fallback() -> str:
     result = subprocess.run(
         ["git", "config", "user.name"],
         capture_output=True,
@@ -160,4 +165,4 @@ def _member() -> str:
         check=False,
     )
     name = result.stdout.strip().lower()
-    return re.sub(r"[^a-z0-9-]", "", name)  # TODO(cli-config): github_login으로 교체
+    return re.sub(r"[^a-z0-9-]", "", name)
