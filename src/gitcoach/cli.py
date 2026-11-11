@@ -6,6 +6,7 @@ from rich.table import Table
 
 from gitcoach import __version__, config, events, guide, shim
 from gitcoach import explain as explain_module
+from gitcoach import sync as sync_module
 
 app = typer.Typer()
 guide_app = typer.Typer()
@@ -167,6 +168,22 @@ def log(today: bool = typer.Option(False, "--today")) -> None:
     for e in rows:
         table.add_row(e.occurred_at, e.rule_id, e.action, e.command_summary, e.branch)
     Console().print(table)
+
+
+@app.command()
+def sync() -> None:
+    try:
+        result = sync_module.push_events()
+    except sync_module.SyncError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
+    typer.echo(
+        f"전송 완료: 새로 저장 {result.inserted}건, 중복(이미 저장됨) {result.duplicate}건"
+    )
+    if result.rejected:
+        typer.echo(f"거절됨 {len(result.rejected)}건:")
+        for event_id, reason in result.rejected:
+            typer.echo(f"  {event_id}: {reason}")
 
 
 if __name__ == "__main__":
