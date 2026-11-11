@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from gitcoach import config, context, events, guide, parser, rules, ui
+from gitcoach import config, context, events, guide, parser, redact, rules, ui
 from gitcoach.models import Choice, GuideAction
 
 
@@ -30,7 +30,7 @@ def run(argv: list[str]) -> int:
         return _exec_git(argv)
 
     choice = ui.prompt_choice(violations)
-    command_summary = " ".join(["git", *argv])
+    command_summary = redact.mask_command_summary(" ".join(["git", *argv]))
 
     if choice is Choice.RUN:
         for v in violations:
