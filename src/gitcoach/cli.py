@@ -102,7 +102,11 @@ def config_protected(branches: list[str] = typer.Argument(None)) -> None:  # noq
     if not branches:
         typer.echo(", ".join(config.protected_branches()))
         return
-    config.set_protected_branches(branches)
+    try:
+        config.set_protected_branches(branches)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
     typer.echo(f"보호 브랜치를 설정했어요: {', '.join(branches)}")
 
 
@@ -118,7 +122,11 @@ def config_disable_rule(rule_id: str) -> None:
 
 @config_app.command("enable-rule")
 def config_enable_rule(rule_id: str) -> None:
-    config.enable_rule(rule_id.upper())
+    try:
+        config.enable_rule(rule_id.upper())
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
     typer.echo(f"{rule_id.upper()}을 켰어요")
 
 
@@ -133,7 +141,11 @@ def config_ollama(
         typer.echo(f"model = {settings.model}")
         _warn_if_ollama_url_overridden()
         return
-    config.set_ollama_settings(url=url, model=model)
+    try:
+        config.set_ollama_settings(url=url, model=model)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1) from exc
     typer.echo("Ollama 설정을 저장했어요")
     _warn_if_ollama_url_overridden()
 

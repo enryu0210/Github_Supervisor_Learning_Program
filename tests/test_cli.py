@@ -74,3 +74,23 @@ def test_config_ollama_no_warning_without_env_var(tmp_path, monkeypatch) -> None
     result = runner.invoke(app, ["config", "ollama", "--url", "http://new:1"])
     assert result.exit_code == 0
     assert "OLLAMA_URL" not in result.stdout
+
+
+def _outside_repo(monkeypatch) -> None:
+    monkeypatch.setattr(config, "find_repo_root", lambda: None)
+
+
+def test_config_protected_outside_repo_shows_message_not_traceback(monkeypatch) -> None:
+    _outside_repo(monkeypatch)
+    result = runner.invoke(app, ["config", "protected", "main"])
+    assert result.exit_code == 1
+    assert "레포 밖에서는" in result.stdout
+
+
+def test_config_enable_rule_outside_repo_shows_message_not_traceback(
+    monkeypatch,
+) -> None:
+    _outside_repo(monkeypatch)
+    result = runner.invoke(app, ["config", "enable-rule", "R05"])
+    assert result.exit_code == 1
+    assert "레포 밖에서는" in result.stdout

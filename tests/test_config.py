@@ -202,3 +202,85 @@ def test_dump_toml_roundtrip_with_quotes_and_backslashes(tmp_path, monkeypatch) 
         loaded = tomllib.load(f)
     assert loaded["protected"] == tricky
     assert config.protected_branches() == tricky
+
+
+# ---- 쓰기 경로는 깨진 파일을 덮어쓰지 않고 에러로 멈춘다 (리뷰 1번) ----
+
+
+def test_set_protected_branches_raises_on_broken_file_instead_of_overwriting(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_text('protected = ["main", "release"\n')
+    try:
+        config.set_protected_branches(["main"])
+        assert False, "ValueError를 기대했지만 발생하지 않았어요"
+    except ValueError:
+        pass
+    assert (
+        tmp_path / ".gitcoach.toml"
+    ).read_text() == 'protected = ["main", "release"\n'
+
+
+def test_disable_rule_raises_on_broken_file_instead_of_overwriting(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_bytes(b"disabled_rules = \xff\xfe\n")
+    try:
+        config.disable_rule("R05")
+        assert False, "ValueError를 기대했지만 발생하지 않았어요"
+    except ValueError:
+        pass
+
+
+def test_set_ollama_settings_raises_on_broken_global_file(
+    tmp_path, monkeypatch
+) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    config.GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config.GLOBAL_CONFIG_PATH.write_text("[ollama")
+    try:
+        config.set_ollama_settings(url="http://new:1")
+        assert False, "ValueError를 기대했지만 발생하지 않았어요"
+    except ValueError:
+        pass
+    assert config.GLOBAL_CONFIG_PATH.read_text() == "[ollama"
+
+
+# ---- 숫자·불린 값은 보존한 채 다른 키를 쓸 수 있어야 한다 (리뷰 4번) ----
+
+
+def test_disable_rule_preserves_unrelated_non_string_values(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_text("max_files = 3\nverbose = true\n")
+    config.disable_rule("R05")
+    with (tmp_path / ".gitcoach.toml").open("rb") as f:
+        loaded = tomllib.load(f)
+    assert loaded["max_files"] == 3
+    assert loaded["verbose"] is True
+    assert loaded["disabled_rules"] == ["R05"]
+
+
+# ---- disabled_rules()는 대소문자를 정규화해서 읽는다 (리뷰 5번) ----
+
+
+def test_disabled_rules_normalizes_lowercase_entries(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_text('disabled_rules = ["r05"]')
+    assert config.disabled_rules() == {"R05"}
+
+
+def test_disabled_rules_normalizes_lowercase_r03_and_still_excludes_it(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_text('disabled_rules = ["r03", "r05"]')
+    assert config.disabled_rules() == {"R05"}

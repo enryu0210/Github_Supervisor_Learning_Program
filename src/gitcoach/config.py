@@ -39,15 +39,21 @@ def _resolve(repo_root: Path | None) -> Path | None:
     return _repo_config_path(repo_root)
 
 
-def _load_toml(path: Path | None) -> dict:
+def _load_toml(path: Path | None, *, strict: bool = False) -> dict:
     """설정 파일이 없거나 깨져 있으면(TOML 문법 오류·인코딩 오류·읽기 권한 없음)
-    빈 설정으로 취급한다. 설정은 있으면 좋은 것일 뿐 CLI 동작을 막아선 안 된다."""
+    빈 설정으로 취급한다. 설정은 있으면 좋은 것일 뿐 CLI 동작을 막아선 안 된다.
+
+    단, 쓰기 경로(`strict=True`)는 예외다: 깨진 파일을 빈 설정으로 취급하면
+    read-modify-write가 그 빈 dict로 기존 내용을 덮어써 버리므로, 여기서는
+    에러를 내서 쓰기를 멈춘다."""
     if path is None or not path.exists():
         return {}
     try:
         with path.open("rb") as f:
             return tomllib.load(f)
-    except (OSError, ValueError):
+    except (OSError, ValueError) as exc:
+        if strict:
+            raise ValueError(f"설정 파일을 읽을 수 없어요: {path} ({exc})") from exc
         return {}
 
 
@@ -83,6 +89,10 @@ def _dump_toml(data: dict) -> str:
 def _dump_value(value: object) -> str:
     if isinstance(value, list):
         return "[" + ", ".join(_dump_string(v) for v in value) + "]"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
     if isinstance(value, str):
         return _dump_string(value)
     raise TypeError(f"unsupported TOML value: {value!r}")
@@ -116,14 +126,14 @@ def set_protected_branches(
     path = _repo_config_path(repo_root)
     if path is None:
         raise ValueError("레포 밖에서는 보호 브랜치를 설정할 수 없어요")
-    data = _load_toml(path)
+    data = _load_toml(path, strict=True)
     data["protected"] = branches
     _write_toml(path, data)
 
 
 def disabled_rules(repo_root: Path | None = _UNRESOLVED) -> set[str]:
     data = _load_toml(_resolve(repo_root))
-    rules = set(_as_str_list(data.get("disabled_rules"), []))
+    rules = {r.upper() for r in _as_str_list(data.get("disabled_rules"), [])}
     rules.discard("R03")  # R03은 레포 공용 설정으로도 끌 수 없음(read-time 강제)
     return rules
 
@@ -136,8 +146,8 @@ def disable_rule(rule_id: str, *, repo_root: Path | None = _UNRESOLVED) -> None:
     path = _repo_config_path(repo_root)
     if path is None:
         raise ValueError("레포 밖에서는 규칙을 설정할 수 없어요")
-    data = _load_toml(path)
-    rules = set(_as_str_list(data.get("disabled_rules"), []))
+    data = _load_toml(path, strict=True)
+    rules = {r.upper() for r in _as_str_list(data.get("disabled_rules"), [])}
     rules.add(rule_id)
     data["disabled_rules"] = sorted(rules)
     _write_toml(path, data)
@@ -149,8 +159,8 @@ def enable_rule(rule_id: str, *, repo_root: Path | None = _UNRESOLVED) -> None:
     path = _repo_config_path(repo_root)
     if path is None:
         raise ValueError("레포 밖에서는 규칙을 설정할 수 없어요")
-    data = _load_toml(path)
-    rules = set(_as_str_list(data.get("disabled_rules"), []))
+    data = _load_toml(path, strict=True)
+    rules = {r.upper() for r in _as_str_list(data.get("disabled_rules"), [])}
     rules.discard(rule_id)
     data["disabled_rules"] = sorted(rules)
     _write_toml(path, data)
@@ -176,7 +186,7 @@ def ollama_settings() -> OllamaSettings:
 def set_ollama_settings(*, url: str | None = None, model: str | None = None) -> None:
     if url is None and model is None:
         return
-    data = _load_toml(GLOBAL_CONFIG_PATH)
+    data = _load_toml(GLOBAL_CONFIG_PATH, strict=True)
     ollama = data.get("ollama")
     ollama = dict(ollama) if isinstance(ollama, dict) else {}
     if url is not None:
