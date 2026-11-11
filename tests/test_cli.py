@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from gitcoach import __version__, config
+from gitcoach import __version__, config, sync
 from gitcoach.cli import app
 
 runner = CliRunner()
@@ -94,3 +94,41 @@ def test_config_enable_rule_outside_repo_shows_message_not_traceback(
     result = runner.invoke(app, ["config", "enable-rule", "R05"])
     assert result.exit_code == 1
     assert "레포 밖에서는" in result.stdout
+
+
+def test_sync_command_prints_summary(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sync,
+        "push_events",
+        lambda: sync.SyncResult(inserted=2, duplicate=1, rejected=[]),
+    )
+    result = runner.invoke(app, ["sync"])
+    assert result.exit_code == 0
+    assert "새로 저장 2건" in result.stdout
+    assert "중복(이미 저장됨) 1건" in result.stdout
+
+
+def test_sync_command_prints_rejected_reasons(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sync,
+        "push_events",
+        lambda: sync.SyncResult(
+            inserted=0, duplicate=0, rejected=[("ev-1", "형식 오류")]
+        ),
+    )
+    result = runner.invoke(app, ["sync"])
+    assert result.exit_code == 0
+    assert "거절됨 1건" in result.stdout
+    assert "ev-1: 형식 오류" in result.stdout
+
+
+def test_sync_command_shows_message_not_traceback_when_env_missing(
+    monkeypatch,
+) -> None:
+    def fake_push_events():
+        raise sync.SyncError("환경변수가 필요해요")
+
+    monkeypatch.setattr(sync, "push_events", fake_push_events)
+    result = runner.invoke(app, ["sync"])
+    assert result.exit_code == 1
+    assert "환경변수가 필요해요" in result.stdout

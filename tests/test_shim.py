@@ -150,6 +150,23 @@ def test_run_disabled_rule_does_not_affect_other_rules(tmp_path, monkeypatch) ->
     assert [r.rule_id for r in rows] == ["R01"]
 
 
+def test_run_masks_credentials_in_recorded_command_summary(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation()])
+    monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.RUN)
+    monkeypatch.setattr(shim, "_exec_git", lambda argv: 0)
+    shim.run(["push", "https://user:ghp_secrettoken@github.com/x", "main"])
+    rows = events.query()
+    assert len(rows) == 1
+    assert "ghp_secrettoken" not in rows[0].command_summary
+    assert "user" not in rows[0].command_summary
+
+
 def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()

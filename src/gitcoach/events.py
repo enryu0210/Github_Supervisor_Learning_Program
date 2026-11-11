@@ -26,9 +26,17 @@ CREATE TABLE IF NOT EXISTS events (
     pr_number INTEGER,
     explanation TEXT,
     llm_used INTEGER NOT NULL,
-    related_event_id TEXT
+    related_event_id TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
 )
 """
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(_SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
+    if "synced" not in columns:
+        conn.execute("ALTER TABLE events ADD COLUMN synced INTEGER NOT NULL DEFAULT 0")
 
 
 def make_event(
@@ -66,7 +74,7 @@ def record(event: Event) -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         conn.execute(
             """
             INSERT INTO events (
@@ -106,7 +114,7 @@ def update_explanation(event_id: str, explanation: str, llm_used: bool) -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         conn.execute(
             "UPDATE events SET explanation = ?, llm_used = ? WHERE id = ?",
             (explanation, int(llm_used), event_id),
@@ -121,7 +129,7 @@ def query(*, today: bool = False) -> list[Event]:
         return []
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         sql = "SELECT * FROM events WHERE repo = ?"
         params: list = [_repo()]
         if today:
@@ -136,25 +144,82 @@ def query(*, today: bool = False) -> list[Event]:
     return [_row_to_event(dict(zip(columns, row))) for row in rows]
 
 
+def unsynced(limit: int = 100) -> list[Event]:
+    """아직 서버로 보내지 않은 이벤트를 전역(레포 무관)으로 조회한다.
+    `query()`/`log`와 달리 레포 필터가 없다 — 학생이 여러 팀 레포를 오갈 수 있어
+    `sync`는 로컬에 쌓인 모든 레포의 미전송 이벤트를 다 올려야 한다."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        cursor = conn.execute(
+            "SELECT * FROM events WHERE synced = 0 ORDER BY occurred_at, id LIMIT ?",
+            (limit,),
+        )
+        columns = [c[0] for c in cursor.description]
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return [_row_to_event(dict(zip(columns, row))) for row in rows]
+
+
+def mark_synced(ids: list[str]) -> None:
+    if not ids:
+        return
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"UPDATE events SET synced = 1 WHERE id IN ({placeholders})", ids)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def mark_rejected(ids: list[str]) -> None:
+    """서버가 거절한 이벤트를 synced=2로 영구 제외한다. rejected가 synced=0으로
+    남으면 unsynced()가 매번 같은 거절 건부터 돌려줘 그 뒤 정상 이벤트가
+    전송되지 못하는 문제(#60 리뷰)를 막기 위함. 재전송은 별도 기능으로 다룬다."""
+    if not ids:
+        return
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"UPDATE events SET synced = 2 WHERE id IN ({placeholders})", ids)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _row_to_event(row: dict) -> Event:
+    row.pop("synced", None)  # synced는 로컬 전송 상태일 뿐 스키마 v1 필드가 아님
     row["llm_used"] = bool(row["llm_used"])
     return Event(**row)
 
 
 def _repo() -> str:
-    result = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    url = result.stdout.strip()
+    # fork+PR 워크플로에서 origin은 각자의 fork라 팀 공용 레포 이름이 아니다.
+    # upstream(팀 레포)을 우선 쓰고, 없으면(혼자 쓰는 레포 등) origin으로 폴백한다.
+    url = _remote_url("upstream") or _remote_url("origin")
     match = re.search(r"[:/]([^/]+/[^/]+?)(?:\.git)?$", url)
     return match.group(1).lower() if match else url.lower()
 
 
+def _remote_url(name: str) -> str:
+    result = subprocess.run(
+        ["git", "remote", "get-url", name],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip()
+
+
 def _member() -> str:
-    return config.member() or _member_fallback()
+    return (config.member() or _member_fallback()).strip().lower()
 
 
 def _member_fallback() -> str:
