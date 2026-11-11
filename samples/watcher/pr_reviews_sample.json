@@ -1,0 +1,72 @@
+[
+  {
+    "review_id": 5001000001,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 101,
+    "reviewer": "leafbell-sii",
+    "status": "COMMENTED",
+    "submitted_at": "2026-11-10T11:00:00+09:00",
+    "commit_sha": "a1b2c3d4e5f60718293a4b5c6d7e8f901234567",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/101#pullrequestreview-5001000001"
+  },
+  {
+    "review_id": 5001000002,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 102,
+    "reviewer": "enryu0210",
+    "status": "APPROVED",
+    "submitted_at": "2026-11-07T10:00:00+09:00",
+    "commit_sha": "b2c3d4e5f60718293a4b5c6d7e8f9012345678a",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/102#pullrequestreview-5001000002"
+  },
+  {
+    "review_id": 5001000003,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 103,
+    "reviewer": "kkanooww",
+    "status": "COMMENTED",
+    "submitted_at": "2026-11-05T16:30:00+09:00",
+    "commit_sha": "c3d4e5f60718293a4b5c6d7e8f9012345678ab2",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/103#pullrequestreview-5001000003"
+  },
+  {
+    "review_id": 5001000004,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 103,
+    "reviewer": "enryu0210",
+    "status": "APPROVED",
+    "submitted_at": "2026-11-05T17:50:00+09:00",
+    "commit_sha": "c3d4e5f60718293a4b5c6d7e8f9012345678ab2",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/103#pullrequestreview-5001000004"
+  },
+  {
+    "review_id": 5001000005,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 105,
+    "reviewer": "kkanooww",
+    "status": "APPROVED",
+    "submitted_at": "2026-11-08T19:50:00+09:00",
+    "commit_sha": "d4e5f60718293a4b5c6d7e8f9012345678ab2c3",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/105#pullrequestreview-5001000005"
+  },
+  {
+    "review_id": 5001000006,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 106,
+    "reviewer": "leafbell-sii",
+    "status": "DISMISSED",
+    "submitted_at": "2026-11-11T05:12:20+09:00",
+    "commit_sha": "e5f60718293a4b5c6d7e8f9012345678ab2c3d4",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/106#pullrequestreview-5001000006"
+  },
+  {
+    "review_id": 5001000007,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 106,
+    "reviewer": "enryu0210",
+    "status": "APPROVED",
+    "submitted_at": "2026-11-11T05:40:59+09:00",
+    "commit_sha": "f60718293a4b5c6d7e8f9012345678ab2c3d4e5",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/106#pullrequestreview-5001000007"
+  }
+]
