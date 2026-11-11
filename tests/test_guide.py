@@ -400,6 +400,50 @@ def test_result_events_copy_repo_member_from_original_snapshot_not_recomputed(
     )
 
 
+def test_discarded_snapshot_with_blank_repo_member_falls_back_to_current_context(
+    tmp_path, monkeypatch
+) -> None:
+    """이 PR 이전 버전으로 저장된 guide_state는 repo·member 키가 없어 "" 로
+    복원된다. "" 를 그대로 쓰면 결과 이벤트가 빈 repo·member로 기록되므로,
+    이 경우에만 현재 context로 폴백해야 한다(#63 리뷰)."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    monkeypatch.setattr(events, "_repo", lambda: "team/original-repo")
+    monkeypatch.setattr(events, "_member", lambda: "original-member")
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev)
+    guide_state = guide.state.GuideState(
+        queue=[
+            guide.ViolationSnapshot(
+                rule_id="R01",
+                severity="high",
+                branch="main",
+                guide_id="r01_protected_push",
+                facts={},
+                event_id=ev.id,
+                command_summary="git push origin main",
+            )
+        ]
+    )
+    guide.state.save(guide_state)
+
+    guide.stop()
+
+    conn = sqlite3.connect(tmp_path / "events.db")
+    row = conn.execute(
+        "SELECT repo, member FROM events WHERE action = 'guide_stopped'"
+    ).fetchone()
+    assert row == ("team/original-repo", "original-member")
+
+
 def test_r03_step1_requires_the_flagged_file(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()

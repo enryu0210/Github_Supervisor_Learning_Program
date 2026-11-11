@@ -53,7 +53,9 @@ def _discard_queue(queue: list[ViolationSnapshot]) -> None:
     """남은 큐 전체에 `guide_stopped`를 남긴다 — 덮어쓰기·`guide stop`으로
     시작도 못 한 가이드가 결과 이벤트 없이 사라지는 문제를 막는다(#47-1).
     `repo`·`member`는 원래 `guided` 이벤트를 만들 때 스냅샷에 저장해 둔 값을
-    그대로 쓴다(현재 context를 다시 읽지 않음, 01_cli.md 6절)."""
+    그대로 쓴다(현재 context를 다시 읽지 않음, 01_cli.md 6절). 이 필드가 생기기
+    전에 저장된 `guide_state`에서 복원된 스냅샷은 빈 문자열이라 `or None`으로
+    현재 context에 폴백한다(#63 리뷰)."""
     for snap in queue:
         if snap.event_id is not None:
             events.record(
@@ -64,8 +66,8 @@ def _discard_queue(queue: list[ViolationSnapshot]) -> None:
                     action="guide_stopped",
                     command_summary=snap.command_summary,
                     related_event_id=snap.event_id,
-                    repo=snap.repo,
-                    member=snap.member,
+                    repo=snap.repo or None,
+                    member=snap.member or None,
                 )
             )
 
@@ -153,8 +155,8 @@ def _stop_current(*, advance_queue: bool) -> str:
                 action="guide_stopped",
                 command_summary=snap.command_summary,
                 related_event_id=snap.event_id,
-                repo=snap.repo,
-                member=snap.member,
+                repo=snap.repo or None,
+                member=snap.member or None,
             )
         )
 
@@ -195,8 +197,8 @@ def _advance(guide_state: GuideState, scenario: Scenario) -> str:
                 action="guide_completed",
                 command_summary=snap.command_summary,
                 related_event_id=snap.event_id,
-                repo=snap.repo,
-                member=snap.member,
+                repo=snap.repo or None,
+                member=snap.member or None,
             )
         )
     summary = f"✅ 가이드 완료! 배운 점: {scenario.summary}"
