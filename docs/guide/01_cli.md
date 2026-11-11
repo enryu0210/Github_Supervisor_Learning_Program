@@ -262,12 +262,13 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - PR 데이터 수집 시 `author`·`reviewers`는 GitHub API 값을 그대로 쓰지 않고 `lower()` 처리 후 저장한다(DB `members.github_login` 소문자 제약과 매칭, 11/9 결정).
+- `repo` 값도 `lower()` 처리 후 저장한다(CLI `events._repo()`와 같은 규칙. DB `repos.full_name`과 문자열로 매칭하므로 대소문자가 다르면 팀 레포에 매칭되지 않는다, #55 확인).
 - PR `state`는 GitHub API 값 `open`·`closed`만 받는다. "merged" 여부는 `merged_at` 존재로 판별한다(GitHub API에 `state=merged`는 없음, 11/9 확인).
 - PR `title`은 항상 존재하는 값으로 보고 필수로 수집한다(방치 PR 목록 표시용, `prs.title` not null).
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`. `pr_reviews`도 동일 — 11/14 마이그레이션 전까지는 JSON으로 제공하고, 실제 DB 적재는 11/17~ 일정에 맞춘다(11/9 확정).
 - 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙).
-- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GITCOACH_SYNC_URL`, `GITCOACH_SYNC_TOKEN`(3-7 `gitcoach sync` 사양). 실제 값은 `.env`에만, 레포에는 `.env.example`만.
+- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만. (`GITCOACH_SYNC_URL`·`GITCOACH_SYNC_TOKEN`은 CLI `sync`가 Edge Function을 호출할 때만 쓰는 값이라 watcher 목록에는 없다 — watcher는 service key로 DB에 직접 쓰므로 Edge Function을 거치지 않는다, #45 확정)
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
 - **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다. CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
 
@@ -334,7 +335,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 장일호 | upstream develop 브랜치 보호(승인 1명+), 골격 PR 리뷰, fork PR CI 승인 | 첫 테스트가 올라오면 ci-test 추가, v0.1 이후 pr-convention에 쓸 규칙 엔진 | 11/6 |
 | 임호일 | Windows PC 설치 확인(`pip install -e .` + `gitcoach init`), 패키징 결과 | 11/9 v0.1.0 인계, 설치 절차, `gitcoach doctor` 사양 | 11/9 |
 | 임지윤 | 스키마 v1 변경 확인, 화면에서 필요한 필드 요청 | 스키마 v1(통보), 샘플 이벤트 JSON 20건+(더미, PR #19. 실 코드 완성 후 교체) | 11/9 |
-| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18) | 스키마 v1(통보), `gitcoach sync` 사양, `pr_reviews` 소스 필드 정의(11/9, 동의 완료). **추후 결정**: data-flow ④⑤ "이남주 공동 담당"의 실제 범위(DB 적재 코드 공동작성 vs 스키마/리뷰 지원) — 이남주 확인 예정 | 11/9 |
+| 이남주 | 스키마 v1 변경 반영, `ingest-events` 엔드포인트 주소와 팀 토큰(11/17~18), watcher DB 적재 마이그레이션·적재 SQL 예시·개발 DB 시험·적재 PR 리뷰(data-flow ④⑤ 공동 담당 범위 확정, #45) | 스키마 v1(통보), `gitcoach sync` 사양, `pr_reviews` 소스 필드 정의(11/9, 동의 완료) | 11/9 |
 | 모두 | 가이드 문구·단계가 입문자에게 이해되는지 짧은 피드백 | — | 11/9 |
 
 ## 8. 완료 기준
