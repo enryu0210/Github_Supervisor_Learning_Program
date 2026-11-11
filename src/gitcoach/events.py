@@ -26,9 +26,17 @@ CREATE TABLE IF NOT EXISTS events (
     pr_number INTEGER,
     explanation TEXT,
     llm_used INTEGER NOT NULL,
-    related_event_id TEXT
+    related_event_id TEXT,
+    synced INTEGER NOT NULL DEFAULT 0
 )
 """
+
+
+def _ensure_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(_SCHEMA)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(events)")}
+    if "synced" not in columns:
+        conn.execute("ALTER TABLE events ADD COLUMN synced INTEGER NOT NULL DEFAULT 0")
 
 
 def make_event(
@@ -66,7 +74,7 @@ def record(event: Event) -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         conn.execute(
             """
             INSERT INTO events (
@@ -106,7 +114,7 @@ def update_explanation(event_id: str, explanation: str, llm_used: bool) -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         conn.execute(
             "UPDATE events SET explanation = ?, llm_used = ? WHERE id = ?",
             (explanation, int(llm_used), event_id),
@@ -121,7 +129,7 @@ def query(*, today: bool = False) -> list[Event]:
         return []
     conn = sqlite3.connect(DB_PATH)
     try:
-        conn.execute(_SCHEMA)
+        _ensure_schema(conn)
         sql = "SELECT * FROM events WHERE repo = ?"
         params: list = [_repo()]
         if today:
@@ -136,7 +144,41 @@ def query(*, today: bool = False) -> list[Event]:
     return [_row_to_event(dict(zip(columns, row))) for row in rows]
 
 
+def unsynced(limit: int = 100) -> list[Event]:
+    """아직 서버로 보내지 않은 이벤트를 전역(레포 무관)으로 조회한다.
+    `query()`/`log`와 달리 레포 필터가 없다 — 학생이 여러 팀 레포를 오갈 수 있어
+    `sync`는 로컬에 쌓인 모든 레포의 미전송 이벤트를 다 올려야 한다."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        cursor = conn.execute(
+            "SELECT * FROM events WHERE synced = 0 ORDER BY occurred_at, id LIMIT ?",
+            (limit,),
+        )
+        columns = [c[0] for c in cursor.description]
+        rows = cursor.fetchall()
+    finally:
+        conn.close()
+    return [_row_to_event(dict(zip(columns, row))) for row in rows]
+
+
+def mark_synced(ids: list[str]) -> None:
+    if not ids:
+        return
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"UPDATE events SET synced = 1 WHERE id IN ({placeholders})", ids)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _row_to_event(row: dict) -> Event:
+    row.pop("synced", None)  # synced는 로컬 전송 상태일 뿐 스키마 v1 필드가 아님
     row["llm_used"] = bool(row["llm_used"])
     return Event(**row)
 
