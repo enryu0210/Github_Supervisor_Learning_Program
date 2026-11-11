@@ -80,6 +80,8 @@ class ViolationSnapshot:
     event_id: str | None = None
     command_summary: str = ""
     title: str = ""
+    repo: str = ""
+    member: str = ""
 
 
 @dataclass

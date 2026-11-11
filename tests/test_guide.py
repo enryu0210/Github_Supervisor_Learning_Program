@@ -1,3 +1,4 @@
+import sqlite3
 import subprocess
 
 from gitcoach import events, explain, guide
@@ -270,6 +271,133 @@ def test_stop_clears_entire_queue(tmp_path, monkeypatch) -> None:
     )
     guide.stop()
     assert state.load() is None
+
+
+def test_stop_discards_remaining_queue_as_guide_stopped(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    ev1 = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    ev2 = events.make_event(
+        rule_id="R02",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev1)
+    events.record(ev2)
+    guide.start(
+        [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")],
+        _ctx(),
+        [ev1, ev2],
+        "git push origin main",
+    )
+
+    guide.stop()
+
+    stopped = {
+        e.related_event_id for e in events.query() if e.action == "guide_stopped"
+    }
+    assert stopped == {ev1.id, ev2.id}
+
+
+def test_start_discards_previous_queue_as_guide_stopped(tmp_path, monkeypatch) -> None:
+    """무관한 명령에서 새 위반이 뜨면 진행 중이던 가이드·큐를 버리고 덮어쓴다
+    (01_cli.md 3-3 9번). 버려지는 항목마다 guide_stopped를 남겨야 한다(#47-1)."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    ev1 = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    ev2 = events.make_event(
+        rule_id="R02",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev1)
+    events.record(ev2)
+    guide.start(
+        [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")],
+        _ctx(),
+        [ev1, ev2],
+        "git push origin main",
+    )
+
+    ev3 = events.make_event(
+        rule_id="R04",
+        severity="medium",
+        branch="main",
+        action="guided",
+        command_summary="git commit -m x",
+    )
+    events.record(ev3)
+    guide.start(
+        [_violation(rule_id="R04", guide_id="r04_direct_commit")],
+        _ctx(),
+        [ev3],
+        "git commit -m x",
+    )
+
+    stopped = {
+        e.related_event_id for e in events.query() if e.action == "guide_stopped"
+    }
+    assert stopped == {ev1.id, ev2.id}
+
+
+def test_result_events_copy_repo_member_from_original_snapshot_not_recomputed(
+    tmp_path, monkeypatch
+) -> None:
+    """가이드 완료·중단 이벤트는 원래 guided 이벤트와 같은 repo·member를 써야
+    한다(01_cli.md 6절). context를 다시 읽어 계산하면 안 된다(#47-4)."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    monkeypatch.setattr(events, "_repo", lambda: "team/original-repo")
+    monkeypatch.setattr(events, "_member", lambda: "original-member")
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="git push origin main",
+    )
+    events.record(ev)
+    guide.start([_violation()], _ctx(), [ev], "git push origin main")
+
+    # 가이드 진행 중 context가 바뀌어도(예: config 수정) 결과 이벤트는 원래
+    # 값을 그대로 복사해야 한다 — 다시 계산하면 안 된다.
+    monkeypatch.setattr(events, "_repo", lambda: "team/changed-repo")
+    monkeypatch.setattr(events, "_member", lambda: "changed-member")
+
+    guide.on_command(["switch", "-c", "feature/cli-login-fix"])
+    subprocess.run(["git", "switch", "-c", "feature/cli-login-fix"], check=True)
+    guide.on_command(["push", "-u", "origin", "feature/cli-login-fix"])
+    guide.done()
+
+    conn = sqlite3.connect(tmp_path / "events.db")
+    rows = conn.execute("SELECT action, repo, member FROM events").fetchall()
+    by_action = {row[0]: row for row in rows}
+    assert by_action["guided"] == ("guided", "team/original-repo", "original-member")
+    assert by_action["guide_completed"] == (
+        "guide_completed",
+        "team/original-repo",
+        "original-member",
+    )
 
 
 def test_r03_step1_requires_the_flagged_file(tmp_path, monkeypatch) -> None:

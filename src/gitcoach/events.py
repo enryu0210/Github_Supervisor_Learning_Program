@@ -42,14 +42,20 @@ def make_event(
     explanation: str | None = None,
     llm_used: bool = False,
     related_event_id: str | None = None,
+    repo: str | None = None,
+    member: str | None = None,
 ) -> Event:
+    """`repo`·`member`를 지정하면 그 값을 그대로 쓴다(가이드 결과 이벤트가 원래
+    `guided` 스냅샷 값을 복사할 때 씀). 지정하지 않으면 현재 context에서 다시
+    계산한다 — 가이드 진행 중 브랜치 등이 바뀌어도 결과 이벤트는 원본과 같은
+    값을 가리켜야 하므로(`01_cli.md` 6절) 호출부에서 스냅샷 값을 넘겨야 한다."""
     return Event(
         id=str(uuid.uuid4()),
         schema_version=1,
         occurred_at=datetime.now().astimezone().isoformat(timespec="seconds"),
         source="cli",
-        repo=_repo(),
-        member=_member(),
+        repo=repo if repo is not None else _repo(),
+        member=member if member is not None else _member(),
         rule_id=rule_id,
         severity=severity,
         action=action,

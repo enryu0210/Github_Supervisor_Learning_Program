@@ -21,6 +21,13 @@ def start(
     guide_events: list[Event] | None = None,
     command_summary: str = "",
 ) -> GuideState:
+    previous = state.load()
+    if previous is not None:
+        # 무관한 명령에서 새 위반이 뜨면 진행 중이던 가이드·큐를 버리고 덮어쓴다
+        # (01_cli.md 3-3 9번). 버려지는 항목마다 결과 이벤트를 남겨야 "결과
+        # 이벤트가 없는 guided = 진행 중"이라는 기준이 성립한다(#47-1).
+        _discard_queue(previous.queue)
+
     guide_events = guide_events or [None] * len(violations)
     queue = [
         ViolationSnapshot(
@@ -32,12 +39,35 @@ def start(
             title=v.title,
             event_id=ev.id if ev else None,
             command_summary=command_summary,
+            repo=ev.repo if ev else "",
+            member=ev.member if ev else "",
         )
         for v, ev in zip(violations, guide_events, strict=True)
     ]
     guide_state = GuideState(queue=queue, step_index=0, hint_count=0)
     state.save(guide_state)
     return guide_state
+
+
+def _discard_queue(queue: list[ViolationSnapshot]) -> None:
+    """남은 큐 전체에 `guide_stopped`를 남긴다 — 덮어쓰기·`guide stop`으로
+    시작도 못 한 가이드가 결과 이벤트 없이 사라지는 문제를 막는다(#47-1).
+    `repo`·`member`는 원래 `guided` 이벤트를 만들 때 스냅샷에 저장해 둔 값을
+    그대로 쓴다(현재 context를 다시 읽지 않음, 01_cli.md 6절)."""
+    for snap in queue:
+        if snap.event_id is not None:
+            events.record(
+                events.make_event(
+                    rule_id=snap.rule_id,
+                    severity=snap.severity,
+                    branch=snap.branch,
+                    action="guide_stopped",
+                    command_summary=snap.command_summary,
+                    related_event_id=snap.event_id,
+                    repo=snap.repo,
+                    member=snap.member,
+                )
+            )
 
 
 def start_message(guide_state: GuideState, command_summary: str) -> str:
@@ -123,10 +153,15 @@ def _stop_current(*, advance_queue: bool) -> str:
                 action="guide_stopped",
                 command_summary=snap.command_summary,
                 related_event_id=snap.event_id,
+                repo=snap.repo,
+                member=snap.member,
             )
         )
 
     if not advance_queue:
+        # guide stop은 큐 전체를 중단한다 — 현재 가이드 말고 남은 큐도 결과
+        # 이벤트 없이 사라지면 안 된다(#47-1, 01_cli.md 3-3 8번).
+        _discard_queue(guide_state.queue[1:])
         state.clear()
         return "가이드를 중단했어요."
 
@@ -160,6 +195,8 @@ def _advance(guide_state: GuideState, scenario: Scenario) -> str:
                 action="guide_completed",
                 command_summary=snap.command_summary,
                 related_event_id=snap.event_id,
+                repo=snap.repo,
+                member=snap.member,
             )
         )
     summary = f"✅ 가이드 완료! 배운 점: {scenario.summary}"
