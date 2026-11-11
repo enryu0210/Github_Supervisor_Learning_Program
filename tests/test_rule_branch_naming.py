@@ -105,3 +105,23 @@ def test_checkout_dash_b_with_start_point_checks_new_name_only() -> None:
         positionals=["feature/cli-x", "origin/develop"],
     )
     assert check_branch_naming(cmd, _ctx()) is None
+
+
+def test_branch_dash_u_setting_upstream_is_not_violation() -> None:
+    cmd = Command(subcommand="branch", flags=["-u"], positionals=["origin/develop"])
+    assert check_branch_naming(cmd, _ctx()) is None
+
+
+def test_branch_contains_query_is_not_violation() -> None:
+    cmd = Command(subcommand="branch", flags=["--contains"], positionals=["abc123"])
+    assert check_branch_naming(cmd, _ctx()) is None
+
+
+def test_branch_create_with_start_point_is_violation() -> None:
+    cmd = Command(
+        subcommand="branch", flags=[], positionals=["MyBranch", "origin/develop"]
+    )
+    v = check_branch_naming(cmd, _ctx())
+    assert v is not None
+    assert v.rule_id == "R05"
+    assert v.facts["branch_name"] == "MyBranch"

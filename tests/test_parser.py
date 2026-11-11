@@ -29,6 +29,24 @@ def test_parse_commit_message() -> None:
     assert cmd.message == "fix: 버그 수정"
 
 
+def test_parse_commit_short_combined_flag_am() -> None:
+    cmd = parser.parse(["commit", "-am", "fix"])
+    assert cmd.flags == ["-a"]
+    assert cmd.message == "fix"
+
+
+def test_parse_commit_message_equals_form() -> None:
+    cmd = parser.parse(["commit", "--message=fix"])
+    assert cmd.flags == []
+    assert cmd.message == "fix"
+
+
+def test_parse_commit_short_attached_message_mfix() -> None:
+    cmd = parser.parse(["commit", "-mfix"])
+    assert cmd.flags == []
+    assert cmd.message == "fix"
+
+
 def test_parse_unknown_subcommand_passes_through() -> None:
     cmd = parser.parse(["status"])
     assert cmd.subcommand == "status"

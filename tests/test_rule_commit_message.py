@@ -39,3 +39,10 @@ def test_commit_without_message_flag_is_not_violation() -> None:
 def test_non_commit_command_is_not_violation() -> None:
     cmd = Command(subcommand="push", flags=[], positionals=["origin"])
     assert check_commit_message(cmd, _ctx()) is None
+
+
+def test_commit_dash_am_with_bad_message_is_violation() -> None:
+    cmd = Command(subcommand="commit", flags=["-a"], positionals=[], message="fix")
+    v = check_commit_message(cmd, _ctx())
+    assert v is not None
+    assert v.rule_id == "R06"

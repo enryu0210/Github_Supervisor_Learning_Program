@@ -9,7 +9,9 @@ _DOCS_RE = re.compile(r"^docs/[a-z0-9-]+$")
 _RELEASE_RE = re.compile(r"^release/v\d+\.\d+$")
 
 _CREATE_FLAGS = {"-b", "-B", "-c", "-C"}
-_BRANCH_SKIP_FLAGS = {"-d", "-D", "-m", "-M", "-a", "-r", "-v", "--list"}
+# `branch` 생성 때 같이 쓰는 플래그만 허용한다. 그 밖의 플래그(-u, --contains 등)는 값을 받거나
+# 조회·삭제용이라, 뒤따르는 인자를 새 브랜치명으로 읽으면 오탐이 난다.
+_BRANCH_CREATE_FLAGS = {"-f", "--force", "-t", "--track", "--no-track"}
 
 _CONSEQUENCE = "watcher가 다시 경고하고, pr-convention 검사가 실패하고, 대시보드 통계에서 빠질 수 있어요."
 
@@ -65,9 +67,10 @@ def _creating_branch_name(cmd: Command) -> str | None:
         # `checkout -b <새 이름> [시작점]`: 마지막 인자는 시작점일 수 있어 첫 인자를 본다
         return cmd.positionals[0] if cmd.positionals else None
     if cmd.subcommand == "branch":
-        if _BRANCH_SKIP_FLAGS & set(cmd.flags):
+        if set(cmd.flags) - _BRANCH_CREATE_FLAGS:
             return None
-        return cmd.positionals[0] if len(cmd.positionals) == 1 else None
+        # `branch <새 이름> [시작점]`: 새 이름은 항상 첫 인자다
+        return cmd.positionals[0] if 1 <= len(cmd.positionals) <= 2 else None
     return None
 
 
