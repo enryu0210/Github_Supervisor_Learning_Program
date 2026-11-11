@@ -221,6 +221,99 @@ def test_mark_synced_does_not_change_query_output(tmp_path, monkeypatch) -> None
     assert rows[0].id == ev.id
 
 
+def test_mark_rejected_excludes_from_unsynced(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="x",
+    )
+    events.record(ev)
+    assert len(events.unsynced()) == 1
+    events.mark_rejected([ev.id])
+    # 거절된 이벤트는 재전송 대상이 아니라 synced처럼 unsynced()에서 빠져야 한다
+    # (synced=0으로 남으면 매번 배치 앞자리를 차지해 그 뒤 이벤트가 막힌다)
+    assert events.unsynced() == []
+
+
+def test_mark_rejected_does_not_change_query_output(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="x",
+    )
+    events.record(ev)
+    events.mark_rejected([ev.id])
+    rows = events.query()
+    assert len(rows) == 1
+    assert rows[0].id == ev.id
+
+
+def test_member_is_lowercased_even_if_config_has_mixed_case(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    (tmp_path / "config.toml").write_text('member = "LeafBell-SII"')
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="x",
+    )
+    assert ev.member == "leafbell-sii"
+
+
+def test_repo_prefers_upstream_remote_over_origin(tmp_path, monkeypatch) -> None:
+    # fork+PR 워크플로에서 origin은 각자의 fork라, 팀 공용 레포 이름은
+    # upstream에서 읽어야 한다(아니면 매 팀원의 이벤트에 fork 이름이 찍힌다)
+    monkeypatch.chdir(tmp_path)
+    _init_repo(remote="https://github.com/my-fork/repo.git")
+    subprocess.run(
+        ["git", "remote", "add", "upstream", "https://github.com/team/repo.git"],
+        check=True,
+    )
+    _use_tmp_global_config(tmp_path, monkeypatch)
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="x",
+    )
+    assert ev.repo == "team/repo"
+
+
+def test_repo_falls_back_to_origin_without_upstream(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(remote="https://github.com/team/repo.git")
+    _use_tmp_global_config(tmp_path, monkeypatch)
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="x",
+    )
+    assert ev.repo == "team/repo"
+
+
 def test_migration_adds_synced_column_to_pre_existing_db(tmp_path, monkeypatch) -> None:
     # cli-sync 이전 버전으로 만들어진(synced 컬럼 없는) DB를 열어도 깨지지 않아야 한다
     monkeypatch.chdir(tmp_path)

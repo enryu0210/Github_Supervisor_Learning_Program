@@ -110,7 +110,9 @@ def test_push_events_marks_inserted_and_duplicate_as_synced(
     assert events.unsynced() == []
 
 
-def test_push_events_keeps_rejected_as_unsynced(tmp_path, monkeypatch) -> None:
+def test_push_events_excludes_rejected_from_future_unsynced(
+    tmp_path, monkeypatch
+) -> None:
     _setup(tmp_path, monkeypatch)
     ids = _record_events(1)
 
@@ -123,8 +125,63 @@ def test_push_events_keeps_rejected_as_unsynced(tmp_path, monkeypatch) -> None:
     result = sync.push_events()
     assert result.inserted == 0
     assert result.rejected == [(ids[0], "형식 오류")]
-    # 거절된 이벤트는 synced 처리되지 않아 다음 sync에서 다시 시도된다
-    assert len(events.unsynced()) == 1
+    # 거절된 이벤트를 synced=0으로 남기면 다음 sync에서 계속 같은 배치 앞자리를
+    # 차지해 그 뒤 정상 이벤트가 전송되지 못한다 — 영구 제외해야 한다.
+    assert events.unsynced() == []
+
+
+def test_push_events_old_rejected_does_not_block_newer_events(
+    tmp_path, monkeypatch
+) -> None:
+    # 리뷰에서 재현된 시나리오: 거절 100건(오래됨) 뒤에 쌓인 정상 건이
+    # 영원히 전송되지 않던 문제
+    _setup(tmp_path, monkeypatch)
+    rejected_ids = set(_record_events(sync.BATCH_SIZE, prefix="bad"))
+    good_ids = _record_events(5, prefix="good")
+
+    def fake_post(url, *, json, headers, timeout):
+        results = [
+            {"id": e["id"], "status": "rejected", "reason": "형식 오류"}
+            if e["id"] in rejected_ids
+            else {"id": e["id"], "status": "inserted"}
+            for e in json["events"]
+        ]
+        return _FakeResponse({"results": results})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert result.inserted == 5
+    assert {i for i, _ in result.rejected} == rejected_ids
+    assert good_ids  # sanity: 정상 건이 실제로 기록됐는지 확인
+    assert events.unsynced() == []
+    # 다시 실행해도 이미 영구 제외된 거절 건이 재집계되지 않는다
+    result2 = sync.push_events()
+    assert result2.rejected == []
+    assert result2.inserted == 0
+
+
+def test_push_events_does_not_recount_same_rejected_id_across_batches(
+    tmp_path, monkeypatch
+) -> None:
+    # 거절 1건 + 정상 다건을 여러 배치로 처리할 때, 같은 거절 id가 배치마다
+    # 다시 조회되어 result.rejected에 중복으로 쌓이면 안 된다
+    _setup(tmp_path, monkeypatch)
+    bad_id = _record_events(1, prefix="bad")[0]
+    _record_events(sync.BATCH_SIZE + 5, prefix="good")
+
+    def fake_post(url, *, json, headers, timeout):
+        results = [
+            {"id": e["id"], "status": "rejected", "reason": "형식 오류"}
+            if e["id"] == bad_id
+            else {"id": e["id"], "status": "inserted"}
+            for e in json["events"]
+        ]
+        return _FakeResponse({"results": results})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert result.rejected == [(bad_id, "형식 오류")]
+    assert result.inserted == sync.BATCH_SIZE + 5
 
 
 def test_push_events_stops_when_batch_makes_no_progress(tmp_path, monkeypatch) -> None:
@@ -176,6 +233,22 @@ def test_push_events_raises_on_http_error(tmp_path, monkeypatch) -> None:
 
     def fake_post(url, *, json, headers, timeout):
         raise httpx.ConnectError("connection refused")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    with pytest.raises(sync.SyncError):
+        sync.push_events()
+
+
+def test_push_events_raises_sync_error_on_malformed_response(
+    tmp_path, monkeypatch
+) -> None:
+    _setup(tmp_path, monkeypatch)
+    _record_events(1)
+
+    def fake_post(url, *, json, headers, timeout):
+        # "status" 필드가 없는 등 가정과 다른 응답 — KeyError가 traceback으로
+        # 새지 않고 SyncError로 바뀌어야 한다
+        return _FakeResponse({"results": [{"id": "x"}]})
 
     monkeypatch.setattr(httpx, "post", fake_post)
     with pytest.raises(sync.SyncError):

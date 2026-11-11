@@ -177,6 +177,23 @@ def mark_synced(ids: list[str]) -> None:
         conn.close()
 
 
+def mark_rejected(ids: list[str]) -> None:
+    """서버가 거절한 이벤트를 synced=2로 영구 제외한다. rejected가 synced=0으로
+    남으면 unsynced()가 매번 같은 거절 건부터 돌려줘 그 뒤 정상 이벤트가
+    전송되지 못하는 문제(#60 리뷰)를 막기 위함. 재전송은 별도 기능으로 다룬다."""
+    if not ids:
+        return
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _ensure_schema(conn)
+        placeholders = ",".join("?" * len(ids))
+        conn.execute(f"UPDATE events SET synced = 2 WHERE id IN ({placeholders})", ids)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _row_to_event(row: dict) -> Event:
     row.pop("synced", None)  # synced는 로컬 전송 상태일 뿐 스키마 v1 필드가 아님
     row["llm_used"] = bool(row["llm_used"])
@@ -184,19 +201,25 @@ def _row_to_event(row: dict) -> Event:
 
 
 def _repo() -> str:
-    result = subprocess.run(
-        ["git", "remote", "get-url", "origin"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    url = result.stdout.strip()
+    # fork+PR 워크플로에서 origin은 각자의 fork라 팀 공용 레포 이름이 아니다.
+    # upstream(팀 레포)을 우선 쓰고, 없으면(혼자 쓰는 레포 등) origin으로 폴백한다.
+    url = _remote_url("upstream") or _remote_url("origin")
     match = re.search(r"[:/]([^/]+/[^/]+?)(?:\.git)?$", url)
     return match.group(1).lower() if match else url.lower()
 
 
+def _remote_url(name: str) -> str:
+    result = subprocess.run(
+        ["git", "remote", "get-url", name],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip()
+
+
 def _member() -> str:
-    return config.member() or _member_fallback()
+    return (config.member() or _member_fallback()).strip().lower()
 
 
 def _member_fallback() -> str:
