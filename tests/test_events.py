@@ -42,6 +42,23 @@ def test_make_event_fills_all_fields(tmp_path, monkeypatch) -> None:
     assert ev.related_event_id is None
 
 
+def test_make_event_repo_member_override_skips_recompute(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guide_completed",
+        command_summary="git push origin main",
+        repo="other/repo",
+        member="other-member",
+    )
+    assert ev.repo == "other/repo"
+    assert ev.member == "other-member"
+
+
 def test_record_then_query_roundtrips(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
