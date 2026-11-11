@@ -1,6 +1,6 @@
 import subprocess
 
-from gitcoach import events
+from gitcoach import config, events
 
 
 def _init_repo(remote: str = "https://github.com/team/repo.git") -> None:
@@ -15,9 +15,14 @@ def _use_tmp_db(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(events, "DB_PATH", tmp_path / "events.db")
 
 
+def _use_tmp_global_config(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(config, "GLOBAL_CONFIG_PATH", tmp_path / "config.toml")
+
+
 def test_make_event_fills_all_fields(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
+    _use_tmp_global_config(tmp_path, monkeypatch)
     ev = events.make_event(
         rule_id="R01",
         severity="high",
@@ -40,6 +45,7 @@ def test_record_then_query_roundtrips(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
     _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
     ev = events.make_event(
         rule_id="R01",
         severity="high",
@@ -58,6 +64,7 @@ def test_record_same_id_twice_is_safe(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
     _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
     ev = events.make_event(
         rule_id="R01",
         severity="high",
@@ -74,6 +81,7 @@ def test_query_today_filters_other_dates(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
     _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
     ev = events.make_event(
         rule_id="R01",
         severity="high",
@@ -87,10 +95,27 @@ def test_query_today_filters_other_dates(tmp_path, monkeypatch) -> None:
     assert len(events.query(today=False)) == 1
 
 
+def test_make_event_uses_config_member_when_set(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    (tmp_path / "config.toml").write_text('member = "octocat"')
+
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="git push origin main",
+    )
+    assert ev.member == "octocat"
+
+
 def test_query_filters_by_repo(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo(remote="https://github.com/team/repo-a.git")
     _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
     events.record(
         events.make_event(
             rule_id="R01",

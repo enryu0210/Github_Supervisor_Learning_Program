@@ -1,8 +1,7 @@
-import os
-
 import httpx
 
-MODEL = "gemma4:e2b"
+from gitcoach import config
+
 TIMEOUT = 8.0
 NUM_PREDICT = 200
 
@@ -12,12 +11,12 @@ class OllamaError(Exception):
 
 
 def ask(messages: list[dict]) -> str:
-    base_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    settings = config.ollama_settings()
     try:
         response = httpx.post(
-            f"{base_url}/api/chat",
+            f"{settings.url}/api/chat",
             json={
-                "model": MODEL,
+                "model": settings.model,
                 "messages": messages,
                 "stream": False,
                 "options": {"num_predict": NUM_PREDICT},

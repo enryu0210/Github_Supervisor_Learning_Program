@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 @dataclass
@@ -20,6 +21,13 @@ class Context:
     staged_files: list[str]
     protected_branches: list[str]
     interactive: bool
+    repo_root: Path | None = None
+
+
+@dataclass
+class OllamaSettings:
+    url: str
+    model: str
 
 
 @dataclass

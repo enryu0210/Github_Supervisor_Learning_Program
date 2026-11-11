@@ -175,7 +175,7 @@ git-coach/
 | 모듈 | 핵심 함수 | 돌려주는 것 |
 |---|---|---|
 | parser | `parse(argv) -> Command` | 하위 명령, 플래그, remote, refspec, 메시지 |
-| context | `collect(cmd) -> Context` | 현재 브랜치, push 대상 브랜치, staged 파일, 보호 브랜치, tty 여부 |
+| context | `collect(cmd) -> Context` | 현재 브랜치, push 대상 브랜치, staged 파일, 보호 브랜치, tty 여부, 레포 루트(`repo_root`, 10번 PR에서 추가 — `shim.py`가 `config.disabled_rules()` 호출 시 재사용해 레포 루트 중복 조회 방지) |
 | rules | `check_xxx(cmd, ctx) -> Violation \| None` | 순수 함수, I/O 금지 |
 | rules | `evaluate(cmd, ctx) -> list[Violation]` | 심각도 순 정렬(R03 우선). **화면에는 전부** 표시 |
 | guide | `start(violations) / on_command(argv) / advance() / hint() / done() / stop()` | 시나리오 진행 상태, 다중 위반 큐 |
@@ -208,7 +208,7 @@ git-coach/
 |---|---|
 | `gitcoach init` | 쉘 래퍼 설치, Ollama 연결과 모델 확인, 설정 파일 생성(`gh api user`로 member=github_login 자동 감지 후 소문자로 저장, 실패 시 수동 입력) |
 | `gitcoach doctor` | Ollama·모델·git·래퍼 상태 점검, 문제 시 해결 방법 안내 |
-| `gitcoach config` | 보호 브랜치, 규칙 끄기, Ollama 주소·모델 변경 |
+| `gitcoach config` | 보호 브랜치, 규칙 끄기, Ollama 주소·모델 변경. 설정 파일은 직접 구현한 최소 TOML 쓰기(`_dump_toml`)로 저장하므로, `config` 쓰기 명령을 한 번이라도 실행하면 파일에 있던 주석(`# ...`)은 사라진다(값은 보존됨, 11/11 리뷰 반영) |
 | `gitcoach log [--today]` | 내 위반·선택 기록 보기 |
 | `gitcoach explain <R01>` | 규칙 설명 미리 보기(학습용) |
 | `gitcoach guide [hint\|done\|skip\|stop]` | 학습 가이드 진행 (`cli-guide-engine`, R01~R03 시나리오) |

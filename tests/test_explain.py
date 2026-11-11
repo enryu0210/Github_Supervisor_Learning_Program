@@ -2,6 +2,7 @@ import json
 
 import httpx
 
+from gitcoach import config
 from gitcoach import explain as explain_module
 from gitcoach.explain import cache, ollama, templates
 
@@ -46,6 +47,22 @@ def _use_tmp_cache(tmp_path, monkeypatch) -> None:
 def test_ollama_ask_returns_content_on_success(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "post", lambda *a, **k: _FakeResponse("설명입니다."))
     assert ollama.ask([{"role": "user", "content": "hi"}]) == "설명입니다."
+
+
+def test_ollama_ask_uses_configured_url_and_model(tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(config, "GLOBAL_CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.set_ollama_settings(url="http://configured:9999", model="custom-model")
+
+    calls = []
+
+    def fake_post(url, *, json, **kwargs):
+        calls.append((url, json["model"]))
+        return _FakeResponse("설명입니다.")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    ollama.ask([{"role": "user", "content": "hi"}])
+    assert calls == [("http://configured:9999/api/chat", "custom-model")]
 
 
 def test_ollama_ask_raises_on_timeout(monkeypatch) -> None:

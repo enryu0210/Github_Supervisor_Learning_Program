@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-from gitcoach import context, events, guide, parser, rules, ui
+from gitcoach import config, context, events, guide, parser, rules, ui
 from gitcoach.models import Choice, GuideAction
 
 
@@ -24,7 +24,8 @@ def run(argv: list[str]) -> int:
 
     cmd = parser.parse(argv)
     ctx = context.collect(cmd)
-    violations = rules.evaluate(cmd, ctx)
+    disabled = config.disabled_rules(ctx.repo_root)
+    violations = [v for v in rules.evaluate(cmd, ctx) if v.rule_id not in disabled]
     if not violations:
         return _exec_git(argv)
 

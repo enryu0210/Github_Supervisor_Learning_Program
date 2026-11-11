@@ -65,3 +65,23 @@ def test_collect_interactive(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
     ctx = context.collect(Command(subcommand="status", flags=[], positionals=[]))
     assert ctx.interactive is False
+
+
+def test_collect_repo_root(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], check=True)
+
+    ctx = context.collect(Command(subcommand="status", flags=[], positionals=[]))
+    assert ctx.repo_root is not None
+    assert (ctx.repo_root / ".git").exists()
+
+
+def test_collect_protected_branches_from_gitcoach_toml(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo(tmp_path)
+    (tmp_path / ".gitcoach.toml").write_text('protected = ["main", "develop"]')
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], check=True)
+
+    ctx = context.collect(Command(subcommand="status", flags=[], positionals=[]))
+    assert ctx.protected_branches == ["main", "develop"]
