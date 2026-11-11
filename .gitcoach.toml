@@ -1,0 +1,7 @@
+# 레포 공용 설정 (git에 커밋됨, 팀 전체에 적용)
+# 보호 브랜치: 여기 적힌 브랜치에 직접 push·commit하면 경고가 뜬다
+protected = ["main"]
+
+# 끌 규칙 ID 목록. 예: disabled_rules = ["R05"]
+# R03(비밀 정보 감지)은 여기 적어도 꺼지지 않는다.
+disabled_rules = []
