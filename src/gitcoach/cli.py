@@ -18,6 +18,11 @@ _SAMPLE_VIOLATIONS: dict[str, tuple[str, dict]] = {
     "R02": ("force push", {"push_branch": "main", "remote": "origin"}),
     "R03": ("비밀 정보 staged", {"files": [".env"]}),
     "R04": ("보호된 브랜치(main) 직접 커밋", {"branch": "main"}),
+    "R05": (
+        "브랜치명 규칙 위반",
+        {"branch_name": "MyBranch", "suggestion": "feature/cli-mybranch"},
+    ),
+    "R06": ("커밋 메시지 규칙 위반", {"message": "fix"}),
 }
 
 
