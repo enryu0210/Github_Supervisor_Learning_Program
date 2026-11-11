@@ -1,0 +1,68 @@
+[
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 101,
+    "title": "feat(watcher): GitHub API 폴링 PoC",
+    "author": "kkanooww",
+    "state": "open",
+    "opened_at": "2026-11-10T09:12:00+09:00",
+    "merged_at": null,
+    "reviewers": ["leafbell-sii"],
+    "last_activity_at": "2026-11-10T09:12:00+09:00"
+  },
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 102,
+    "title": "fix(web): 대시보드 방치 PR 카드 정렬",
+    "author": "zrrh8ngbrd-max",
+    "state": "closed",
+    "opened_at": "2026-11-06T14:00:00+09:00",
+    "merged_at": "2026-11-07T10:30:00+09:00",
+    "reviewers": ["enryu0210"],
+    "last_activity_at": "2026-11-07T10:30:00+09:00"
+  },
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 103,
+    "title": "docs(db): ERD v1 반영",
+    "author": "leafbell-sii",
+    "state": "closed",
+    "opened_at": "2026-11-05T11:00:00+09:00",
+    "merged_at": "2026-11-05T18:20:00+09:00",
+    "reviewers": ["enryu0210", "kkanooww"],
+    "last_activity_at": "2026-11-05T18:20:00+09:00"
+  },
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 104,
+    "title": "feat(web): /events 출처 필터 칩",
+    "author": "zrrh8ngbrd-max",
+    "state": "open",
+    "opened_at": "2026-11-07T16:40:00+09:00",
+    "merged_at": null,
+    "reviewers": ["leafbell-sii"],
+    "last_activity_at": "2026-11-07T17:00:00+09:00"
+  },
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 105,
+    "title": "chore(infra): compose watcher 서비스 추가",
+    "author": "enryu0210",
+    "state": "closed",
+    "opened_at": "2026-11-08T08:00:00+09:00",
+    "merged_at": null,
+    "reviewers": ["kkanooww"],
+    "last_activity_at": "2026-11-08T20:10:00+09:00"
+  },
+  {
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "number": 106,
+    "title": "feat(cli): sync 배치 전송 구현",
+    "author": "kkanooww",
+    "state": "open",
+    "opened_at": "2026-11-11T03:04:00+09:00",
+    "merged_at": null,
+    "reviewers": ["leafbell-sii", "enryu0210"],
+    "last_activity_at": "2026-11-11T05:40:00+09:00"
+  }
+]

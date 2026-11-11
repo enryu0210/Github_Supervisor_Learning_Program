@@ -1,0 +1,22 @@
+{
+  "poll_1": {
+    "review_id": 5002000001,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 104,
+    "reviewer": "leafbell-sii",
+    "status": "APPROVED",
+    "submitted_at": "2026-11-07T17:00:00+09:00",
+    "commit_sha": "0718293a4b5c6d7e8f9012345678ab2c3d4e5f60",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/104#pullrequestreview-5002000001"
+  },
+  "poll_2": {
+    "review_id": 5002000001,
+    "repo": "enryu0210/github_supervisor_learning_program",
+    "pr_number": 104,
+    "reviewer": "leafbell-sii",
+    "status": "DISMISSED",
+    "submitted_at": "2026-11-07T17:00:00+09:00",
+    "commit_sha": "0718293a4b5c6d7e8f9012345678ab2c3d4e5f60",
+    "html_url": "https://github.com/enryu0210/github_supervisor_learning_program/pull/104#pullrequestreview-5002000001"
+  }
+}
