@@ -119,6 +119,37 @@ def test_run_interactive_cancel_choice_blocks(tmp_path, monkeypatch) -> None:
     assert rows[0].rule_id == "R03"
 
 
+def test_run_disabled_rule_skips_prompt_and_execs_git(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    (tmp_path / ".gitcoach.toml").write_text('disabled_rules = ["R05"]')
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr(rules, "evaluate", lambda cmd, ctx: [_violation(rule_id="R05")])
+
+    def fail_if_called(violations):
+        raise AssertionError("꺼진 규칙은 선택지를 띄우면 안 돼요")
+
+    monkeypatch.setattr(ui, "prompt_choice", fail_if_called)
+    assert shim.run(["status"]) == 0
+
+
+def test_run_disabled_rule_does_not_affect_other_rules(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    (tmp_path / ".gitcoach.toml").write_text('disabled_rules = ["R05"]')
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+    monkeypatch.setattr(
+        rules,
+        "evaluate",
+        lambda cmd, ctx: [_violation(rule_id="R05"), _violation(rule_id="R01")],
+    )
+    monkeypatch.setattr(ui, "prompt_choice", lambda violations: Choice.RUN)
+    assert shim.run(["status"]) == 0
+    rows = events.query()
+    assert [r.rule_id for r in rows] == ["R01"]
+
+
 def test_run_interactive_guide_choice_cancels_and_prints(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
