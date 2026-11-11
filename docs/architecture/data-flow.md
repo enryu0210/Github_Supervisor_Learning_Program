@@ -1,7 +1,8 @@
-# 데이터 흐름 (Data Flow) v0
+# 데이터 흐름 (Data Flow) v0.1
 
 - 작성: 장일호(PM) · 2026-11-09 · 상태: **초안 (팀 확인 전)**
 - 원본: `data-flow.pdf` (이 파일은 Claude Code가 읽을 수 있게 옮긴 텍스트판)
+- v0.1 (2026-11-10, #46 합의 반영): ⑤ 퀴즈 출제 근거를 DB에서 읽는 흐름 추가 · 적재 규칙을 테이블별로 분리(`prs`·`pr_reviews` upsert) · 서버 키 위치에 Edge Function 추가. **`data-flow.pdf` 원본은 아직 v0 그대로**다.
 - 기준 문서: `docs/guide/01_cli.md` 6절(이벤트 스키마 v1) · `docs/db/ERD.md`(#12) · `dashboard/lib/data`(#11)
 - 범위: 데이터가 **어디서 생겨서 → 어디에 저장되고 → 누가 읽는지**만 다룬다. 컬럼 정의는 ERD, 필드 정의는 스키마 v1이 기준이며 여기서 다시 정의하지 않는다.
 
@@ -47,6 +48,7 @@ flowchart LR
   EDGE --> DB
   GH -->|③ 주기 조회| WATCHER
   WATCHER -->|④ detected·prs · service key| DB
+  DB -->|⑤ 출제 근거 events 읽기 · service key| WATCHER
   WATCHER -->|⑤ 퀴즈 생성| OLLAMA
   WATCHER -->|⑤ quizzes · service key| DB
   DB --> VIEW
@@ -61,13 +63,20 @@ flowchart LR
 | ② | 업로드 | CLI `sync` → `ingest-events` → `events` | ①과 같은 이벤트 묶음 | 팀 토큰 (학생 PC에 서버 키 없음) | 권아현 · 이남주 | 11/17~18 |
 | ③ | 감지 | GitHub API → watcher | 브랜치 · PR · 커밋 · 리뷰 | `GITHUB_TOKEN` | 권아현 | 11/10 |
 | ④ | 감지 결과 적재 | watcher → `events`, `prs` | `detected` 이벤트, PR 상태 | service key | 권아현 · 이남주 | 11/17 (전까지 JSON 파일) |
-| ⑤ | 퀴즈 | watcher → ollama → `quizzes` | `allowed` · `guide_stopped` 기반 문제 | service key | 권아현 · 이남주 | 11/24 |
+| ⑤ | 퀴즈 | `events`(DB) → watcher → ollama → `quizzes` | `allowed` · `guide_stopped` 기반 문제. 출제 근거는 **DB의 `events`**(`source` = `cli`·`github` 모두)에서 읽는다. CLI `sync`는 관여 안 함 (`01_cli.md` 2절 11/24~, 11/9 확정) | service key (읽기·쓰기 모두) | 권아현 · 이남주 | 11/24 |
 | ⑥ | 화면 | 뷰/RPC → dashboard `lib/data` | 집계 · 타임라인 · 방치 PR · 퀴즈 | anon key + 로그인 토큰, RLS | 임지윤 · 이남주 | 11/19~20 (전까지 mock) |
 
 ### 공통 규칙
-- 모든 적재는 `insert … on conflict (id) do nothing` → 같은 것을 다시 보내도 한 번만 저장된다.
-- 적재 순서: **`events` 먼저, `quizzes` 나중** (퀴즈가 출제 근거 이벤트를 가리키기 때문).
-- 키 위치: service key = **watcher 컨테이너만** · 팀 토큰 = **CLI 설정** · anon key = **dashboard**.
+- 모든 적재는 **다시 보내도 결과가 같아야 한다**(멱등). 단, 테이블마다 방식이 다르다 (아래 표).
+
+| 테이블 | 방식 | 이유 |
+|---|---|---|
+| `events` · `quizzes` | `insert … on conflict (id) do nothing` | 한 번 생긴 기록은 바뀌지 않는다 → 처음 것만 남긴다 |
+| `prs` | `(repo_id, number)` 기준 upsert | PR 상태·`last_activity_at`은 계속 바뀐다 → do nothing이면 방치 PR 판정(D2)이 틀어진다 |
+| `pr_reviews` | `review_id`(GitHub 리뷰 id) 기준 upsert | 같은 리뷰를 watcher가 반복 조회한다 |
+
+- 적재 순서: **`events` 먼저, `quizzes` 나중** (퀴즈가 출제 근거 이벤트를 가리키기 때문) · **`prs` 먼저, `pr_reviews` 나중** (리뷰가 PR을 가리키기 때문).
+- 키 위치: service key = **watcher 컨테이너 + Edge Function `ingest-events`(Supabase 함수 환경변수)** · 팀 토큰 = **CLI 설정** · anon key = **dashboard**. service key는 학생 PC·레포·이슈·PR 어디에도 두지 않는다.
 - 시크릿 값은 어떤 흐름에도 싣지 않는다.
 - 시간은 오프셋 포함 ISO 8601로 저장. 화면의 "이번 주"·일별 집계는 KST(`Asia/Seoul`) 기준.
 
