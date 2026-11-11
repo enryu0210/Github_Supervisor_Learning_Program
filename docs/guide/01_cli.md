@@ -175,7 +175,7 @@ git-coach/
 | 모듈 | 핵심 함수 | 돌려주는 것 |
 |---|---|---|
 | parser | `parse(argv) -> Command` | 하위 명령, 플래그, remote, refspec, 메시지 |
-| context | `collect(cmd) -> Context` | 현재 브랜치, push 대상 브랜치, staged 파일, 보호 브랜치, tty 여부 |
+| context | `collect(cmd) -> Context` | 현재 브랜치, push 대상 브랜치, staged 파일, 보호 브랜치, tty 여부, 레포 루트(`repo_root`, 10번 PR에서 추가 — `shim.py`가 `config.disabled_rules()` 호출 시 재사용해 레포 루트 중복 조회 방지) |
 | rules | `check_xxx(cmd, ctx) -> Violation \| None` | 순수 함수, I/O 금지 |
 | rules | `evaluate(cmd, ctx) -> list[Violation]` | 심각도 순 정렬(R03 우선). **화면에는 전부** 표시 |
 | guide | `start(violations) / on_command(argv) / advance() / hint() / done() / stop()` | 시나리오 진행 상태, 다중 위반 큐 |
