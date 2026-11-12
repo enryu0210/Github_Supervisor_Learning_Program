@@ -289,6 +289,20 @@ def test_skip_last_guide_clears_state(tmp_path, monkeypatch) -> None:
     assert state.load() is None
 
 
+def test_skip_last_guide_message_says_original_command_is_recoverable(
+    tmp_path, monkeypatch
+) -> None:
+    """가이드를 포기해도 하려던 작업 자체가 사라진 게 아니라는 걸 알려줘야
+    한다 — 같은 명령을 다시 입력하면 선택 화면이 다시 뜬다(11/12 피드백)."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    guide.start([_violation()], _ctx(), command_summary="git push origin main")
+    message = guide.skip()
+    assert "git push origin main" in message
+    assert "다시" in message
+
+
 def test_stop_clears_entire_queue(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
@@ -298,6 +312,34 @@ def test_stop_clears_entire_queue(tmp_path, monkeypatch) -> None:
     )
     guide.stop()
     assert state.load() is None
+
+
+def test_stop_message_says_original_command_is_recoverable(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    guide.start(
+        [_violation(), _violation(rule_id="R02", guide_id="r02_force_push")],
+        _ctx(),
+        command_summary="git push --force origin main",
+    )
+    message = guide.stop()
+    assert "git push --force origin main" in message
+    assert "다시" in message
+
+
+def test_stop_message_without_command_summary_has_no_dangling_reference(
+    tmp_path, monkeypatch
+) -> None:
+    """기존 호출(command_summary 생략, 기본값 "")에서는 빈 괄호 같은 어색한
+    문구 없이 그냥 "가이드를 중단했어요."만 보여준다."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    guide.start([_violation()], _ctx())
+    assert guide.stop() == "가이드를 중단했어요."
 
 
 def test_stop_discards_remaining_queue_as_guide_stopped(tmp_path, monkeypatch) -> None:
@@ -580,6 +622,42 @@ def test_start_message_includes_explanation_before_guide_header(
     assert "💡 왜 문제일까요?" in message
     assert "main은 팀 전체가 공유하는 브랜치예요." in message
     assert message.index("💡") < message.index("📘")
+
+
+def test_start_message_shows_full_step_overview_for_multi_step_scenario(
+    tmp_path, monkeypatch
+) -> None:
+    """R01은 3단계 시나리오라 가이드 시작 화면에 전체 흐름(치트시트)을
+    먼저 보여줘야 한다 — 단계마다 조금씩 공개하면 중간에 포기하기 쉽다는
+    피드백(11/12)을 반영. hint까지는 보여주되 answer(구체적 명령)는 숨긴다."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _stub_explain(monkeypatch)
+    guide_state = guide.start([_violation()], _ctx())
+    message = guide.start_message(guide_state, "git push origin main")
+
+    scenario = SCENARIOS["r01_protected_push"]
+    assert "전체 흐름" in message
+    for step in scenario.steps:
+        assert step.instruction in message
+        assert step.hint in message
+        if step.answer != step.hint:  # 구체적인 브랜치명 등은 끝까지 숨겨야 함
+            assert step.answer not in message
+
+
+def test_start_message_omits_overview_for_single_step_scenario(
+    tmp_path, monkeypatch
+) -> None:
+    """R05·R06처럼 1단계뿐인 시나리오는 전체 흐름 목록이 현재 단계와
+    중복이라 생략한다."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _stub_explain(monkeypatch)
+    guide_state = guide.start(
+        [_violation(rule_id="R06", guide_id="r06_commit_message")], _ctx()
+    )
+    message = guide.start_message(guide_state, 'git commit -m "bad message"')
+    assert "전체 흐름" not in message
 
 
 def test_second_guide_in_queue_gets_its_own_explanation_and_updates_event(
