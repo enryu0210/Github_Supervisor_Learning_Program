@@ -99,6 +99,33 @@ def test_state_clear_removes_file(tmp_path, monkeypatch) -> None:
     assert state.load() is None
 
 
+def test_state_load_recovers_from_corrupted_file_instead_of_raising(
+    tmp_path, monkeypatch
+) -> None:
+    """Ctrl+C로 save() 쓰기가 끼어들면 guide.json이 반쯤 써진 채로 남을 수
+    있다. 복구할 수 없으니 손상된 파일을 지우고 None을 반환해야 한다 — 그러지
+    않으면 이 레포의 모든 git 명령이 계속 크래시한다(#64)."""
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    guide.start([_violation()], _ctx())
+    path = state._state_path()
+    path.write_text('{"queue": [{"rule_id": "R01"', encoding="utf-8")
+
+    assert state.load() is None
+    assert not path.exists()
+
+
+def test_state_save_is_atomic_leaves_no_leftover_tmp_file(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    guide.start([_violation()], _ctx())
+    path = state._state_path()
+    assert path.exists()
+    assert not path.with_suffix(".tmp").exists()
+
+
 def test_on_command_none_when_no_guide_active(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo()
