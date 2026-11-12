@@ -207,7 +207,7 @@ git-coach/
 | 명령 | 하는 일 |
 |---|---|
 | `gitcoach init` | 쉘 래퍼 설치, Ollama 연결과 모델 확인, 설정 파일 생성(`gh api user`로 member=github_login 자동 감지 후 소문자로 저장, 실패 시 수동 입력) |
-| `gitcoach doctor` | Ollama·모델·git·래퍼 상태 점검, 문제 시 해결 방법 안내 |
+| `gitcoach doctor` | Ollama·모델·git·래퍼·전역 설치 상태 점검, 문제 시 해결 방법 안내 |
 | `gitcoach config` | 보호 브랜치, 규칙 끄기, Ollama 주소·모델 변경. 설정 파일은 직접 구현한 최소 TOML 쓰기(`_dump_toml`)로 저장하므로, `config` 쓰기 명령을 한 번이라도 실행하면 파일에 있던 주석(`# ...`)은 사라진다(값은 보존됨, 11/11 리뷰 반영) |
 | `gitcoach log [--today]` | 내 위반·선택 기록 보기 |
 | `gitcoach explain <R01>` | 규칙 설명 미리 보기(학습용) |

@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
-from gitcoach import __version__, config, sync
+from gitcoach import __version__, config, sync, wrapper
+from gitcoach import doctor as doctor_module
 from gitcoach.cli import app
 
 runner = CliRunner()
@@ -132,3 +133,106 @@ def test_sync_command_shows_message_not_traceback_when_env_missing(
     result = runner.invoke(app, ["sync"])
     assert result.exit_code == 1
     assert "환경변수가 필요해요" in result.stdout
+
+
+# ---- init (12번) ----
+
+
+def test_init_installs_wrapper_and_detects_member_via_gh(monkeypatch) -> None:
+    monkeypatch.setattr(wrapper, "install", lambda: ["bash (~/.bashrc)"])
+    monkeypatch.setattr(config, "member", lambda: None)
+    monkeypatch.setattr(config, "detect_github_login", lambda: "octocat")
+    saved = {}
+    monkeypatch.setattr(
+        config, "set_member", lambda login: saved.setdefault("login", login)
+    )
+    monkeypatch.setattr(doctor_module, "check_ollama", lambda: (True, "Ollama 연결됨"))
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0
+    assert saved["login"] == "octocat"
+    assert "bash (~/.bashrc)" in result.stdout
+
+
+def test_init_falls_back_to_manual_prompt_when_gh_detection_fails(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(wrapper, "install", list)
+    monkeypatch.setattr(config, "member", lambda: None)
+    monkeypatch.setattr(config, "detect_github_login", lambda: None)
+    saved = {}
+    monkeypatch.setattr(
+        config, "set_member", lambda login: saved.setdefault("login", login)
+    )
+    monkeypatch.setattr(
+        doctor_module, "check_ollama", lambda: (False, "Ollama에 연결할 수 없어요")
+    )
+    result = runner.invoke(app, ["init"], input="ManualUser\n")
+    assert result.exit_code == 0
+    assert saved["login"] == "manualuser"
+
+
+def test_init_skips_detection_when_member_already_set(monkeypatch) -> None:
+    monkeypatch.setattr(wrapper, "install", list)
+    monkeypatch.setattr(config, "member", lambda: "existing")
+    called = []
+    monkeypatch.setattr(config, "detect_github_login", lambda: called.append(1) or "x")
+    monkeypatch.setattr(doctor_module, "check_ollama", lambda: (True, "ok"))
+    result = runner.invoke(app, ["init"])
+    assert result.exit_code == 0
+    assert called == []
+    assert "이미 설정된 member: existing" in result.stdout
+
+
+# ---- doctor (결정 5번: git·래퍼만 치명적, Ollama는 경고) ----
+
+
+def test_doctor_exit_code_1_when_git_missing(monkeypatch) -> None:
+    monkeypatch.setattr(
+        doctor_module, "check_git", lambda: (False, "git을 찾을 수 없어요")
+    )
+    monkeypatch.setattr(doctor_module, "check_ollama", lambda: (True, "ok"))
+    monkeypatch.setattr(doctor_module, "check_wrapper", lambda: {"bash": True})
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 1
+
+
+def test_doctor_exit_code_1_when_no_wrapper_installed(monkeypatch) -> None:
+    monkeypatch.setattr(doctor_module, "check_git", lambda: (True, "git 설치됨"))
+    monkeypatch.setattr(doctor_module, "check_ollama", lambda: (True, "ok"))
+    monkeypatch.setattr(
+        doctor_module, "check_wrapper", lambda: {"bash": False, "zsh": False}
+    )
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 1
+
+
+def test_doctor_exit_code_0_when_ollama_down_but_wrapper_installed(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(doctor_module, "check_git", lambda: (True, "git 설치됨"))
+    monkeypatch.setattr(
+        doctor_module, "check_ollama", lambda: (False, "Ollama에 연결할 수 없어요")
+    )
+    monkeypatch.setattr(doctor_module, "check_wrapper", lambda: {"bash": True})
+    result = runner.invoke(app, ["doctor"])
+    assert result.exit_code == 0
+    assert "⚠️" in result.stdout
+
+
+# ---- uninstall (결정 6번: 래퍼만 제거) ----
+
+
+def test_uninstall_reports_removed_targets(monkeypatch) -> None:
+    monkeypatch.setattr(wrapper, "uninstall", lambda: ["bash (~/.bashrc)"])
+    result = runner.invoke(app, ["uninstall"])
+    assert result.exit_code == 0
+    assert "bash (~/.bashrc)" in result.stdout
+
+
+def test_uninstall_when_nothing_installed_shows_friendly_message(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(wrapper, "uninstall", list)
+    result = runner.invoke(app, ["uninstall"])
+    assert result.exit_code == 0
+    assert "제거할 쉘 래퍼가 없어요" in result.stdout

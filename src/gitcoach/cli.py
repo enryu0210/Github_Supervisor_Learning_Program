@@ -4,7 +4,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from gitcoach import __version__, config, events, guide, shim
+from gitcoach import __version__, config, events, guide, shim, wrapper
+from gitcoach import doctor as doctor_module
 from gitcoach import explain as explain_module
 from gitcoach import sync as sync_module
 
@@ -184,6 +185,69 @@ def sync() -> None:
         typer.echo(f"거절됨 {len(result.rejected)}건:")
         for event_id, reason in result.rejected:
             typer.echo(f"  {event_id}: {reason}")
+
+
+@app.command()
+def init() -> None:
+    installed = wrapper.install()
+    typer.echo("쉘 래퍼를 설치했어요:")
+    for item in installed:
+        typer.echo(f"  - {item}")
+
+    login = config.member()
+    if login is not None:
+        typer.echo(f"이미 설정된 member: {login}")
+    else:
+        login = config.detect_github_login()
+        if login is None:
+            typer.echo("gh로 GitHub 아이디를 확인하지 못했어요")
+            login = typer.prompt("GitHub 아이디를 입력해 주세요").strip().lower()
+        config.set_member(login)
+        typer.echo(f"설정을 저장했어요: member = {login}")
+
+    # Ollama는 꺼져 있어도 init 자체는 실패하지 않음(완료 기준 "Ollama 꺼도 동작") — 정보 제공용
+    ok, message = doctor_module.check_ollama()
+    typer.echo(("✅ " if ok else "⚠️ ") + message)
+
+    global_ok, global_message = doctor_module.check_global_install()
+    typer.echo(("✅ " if global_ok else "⚠️ ") + global_message)
+
+
+@app.command()
+def doctor() -> None:
+    exit_code = 0
+
+    git_ok, git_message = doctor_module.check_git()
+    typer.echo(("✅ " if git_ok else "❌ ") + git_message)
+    if not git_ok:
+        exit_code = 1
+
+    ollama_ok, ollama_message = doctor_module.check_ollama()
+    typer.echo(("✅ " if ollama_ok else "⚠️ ") + ollama_message)
+
+    global_ok, global_message = doctor_module.check_global_install()
+    typer.echo(("✅ " if global_ok else "⚠️ ") + global_message)
+
+    wrapper_status = doctor_module.check_wrapper()
+    for label, installed in wrapper_status.items():
+        prefix = "✅ " if installed else "⚠️ "
+        typer.echo(f"{prefix}쉘 래퍼({label}): {'설치됨' if installed else '미설치'}")
+    if not any(wrapper_status.values()):
+        typer.echo("❌ 설치된 쉘 래퍼가 없어요 — gitcoach init을 실행해 주세요")
+        exit_code = 1
+
+    raise typer.Exit(code=exit_code)
+
+
+@app.command()
+def uninstall() -> None:
+    removed = wrapper.uninstall()
+    if not removed:
+        typer.echo("제거할 쉘 래퍼가 없어요")
+        return
+    typer.echo("쉘 래퍼를 제거했어요:")
+    for item in removed:
+        typer.echo(f"  - {item}")
 
 
 if __name__ == "__main__":
