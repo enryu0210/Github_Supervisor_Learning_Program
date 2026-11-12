@@ -290,10 +290,10 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
    - **착수 전 확정 필요**: Events API(폴링)과 웹훅(수신 서버 필요) 중 선택. 전체 구조가 "수 분 단위 폴링"이라 Events API 쪽에 가깝지만 1번 PR 직후 별도로 검증·확정한다.
 
 **2단계 (11/13~16) — 규칙 재사용**
-4. `feature/watcher-rule-branch-naming`(R05) — 브랜치 목록 조회 + 공용 `rules.check_r05` 재사용, entity=브랜치명
+4. `feature/watcher-rule-branch-naming`(R05) — 브랜치 목록 조회 + `is_valid_branch_name(name)`(`rules/r05_branch_naming.py`) 재사용, entity=브랜치명
 5. `feature/watcher-rule-pr-base`(R08) — 열린 PR의 base 확인, entity=`f"pr:{번호}"`, severity low
-6. `feature/watcher-rule-commit-message`(R06) — PR 커밋 목록 조회 + 공용 `rules.check_r06` 재사용, entity=커밋 SHA
-   - **공통 주의**: `rules.check_xxx`는 CLI의 `Command`/`Context`(git 인자·로컬 상태)를 받는 순수 함수다. watcher는 GitHub API 응답을 받으므로, "API 응답 → 기존 `Context`/`Command` 모양으로 변환"하는 어댑터가 4번 PR에 포함돼야 규칙을 중복 구현하지 않는다.
+6. `feature/watcher-rule-commit-message`(R06) — PR 커밋 목록 조회 + `is_valid_commit_message(msg)`(`gitcoach/commit_format.py`) 재사용, entity=커밋 SHA
+   - **공통 주의**: `check_branch_naming`/`check_commit_message`(각 `rules/r05_branch_naming.py`·`rules/r06_commit_message.py`)는 CLI 명령(`Command`/`Context`)을 해석하는 래퍼일 뿐, 실제 판정은 문자열 하나만 받는 순수 함수(`is_valid_branch_name`·`is_valid_commit_message`)로 이미 분리돼 있다. GitHub API에서 받은 브랜치명·커밋 메시지를 이 함수에 바로 넘기면 되므로, 가짜 `Command`/`Context` 어댑터는 필요 없다.
 
 **3단계 (11/17~19) — 방치 PR·리뷰·적재·Docker**
 7. `feature/watcher-stale-prs` — 방치 PR(3일 기준, D3) 감지, `prs.last_activity_at` 산출. rule_id/이벤트화 여부는 D2 미정 — 우선 JSON/DB 뷰용 데이터만 생성
