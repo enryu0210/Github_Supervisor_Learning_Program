@@ -267,7 +267,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
 | 방치된 PR | 마지막 활동 후 **3일**(11/9 임시 결정, N 확정 전까지 watcher·대시보드·DB 뷰 공통 사용) 이상 열린 PR | `prs.last_activity_at`. R08과 무관(성격이 다른 신호라 규칙 위반 통계에서 제외, 11/9 결정). 이 감지를 `detected` 이벤트로도 남길지·rule_id는 **추후 결정**(D2, 뷰 판정만으로 대체 가능, 11/17 전) |
 | 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함. 방치 PR과 동일하게 규칙 위반 통계에서 제외(11/9 결정). rule_id·이벤트화 여부도 **추후 결정**(D2, 위와 동일 건) |
-| PR 리뷰 원본 기록(`pr_reviews`) | `GET /repos/{owner}/{repo}/pulls/{number}/reviews` | 이남주 DB 요청(11/9, 동의 완료). 리뷰 쏠림과 같은 호출 재사용. 필드: `review_id`(네이티브 id)·`repo`·`pr_number`·`reviewer`·`status`·`submitted_at`·`commit_sha`·`html_url`(`body` 제외). CLI·DB는 합의됐으나 웹(임지윤) 확인 전이라 3인 승인 기준으로는 **미정**(D4) |
+| PR 리뷰 원본 기록(`pr_reviews`) | `GET /repos/{owner}/{repo}/pulls/{number}/reviews` | 이남주 DB 요청(11/9, 동의 완료). 리뷰 쏠림과 같은 호출 재사용. 필드: `review_id`(네이티브 id)·`repo`·`pr_number`·`reviewer`·`status`·`submitted_at`·`commit_sha`·`html_url`(`body` 제외). CLI·DB·웹(임지윤) 3인 승인 완료 — **확정**(D4, #44, 11/12) |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - PR 데이터 수집 시 `author`·`reviewers`는 GitHub API 값을 그대로 쓰지 않고 `lower()` 처리 후 저장한다(DB `members.github_login` 소문자 제약과 매칭, 11/9 결정).
@@ -298,7 +298,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 **3단계 (11/17~19) — 방치 PR·리뷰·적재·Docker**
 7. `feature/watcher-stale-prs` — 방치 PR(3일 기준, D3) 감지, `prs.last_activity_at` 산출. rule_id/이벤트화 여부는 D2 미정 — 우선 JSON/DB 뷰용 데이터만 생성
 8. `feature/watcher-review-concentration` — 멤버별 리뷰 수 집계, 쏠림 알림. D2 미정이라 rule_id 없음(통계 집계 전용)
-9. `feature/watcher-pr-reviews`(`pr_reviews`) — `GET /repos/{owner}/{repo}/pulls/{number}/reviews` 수집(8번과 호출 재사용). D4(임지윤 확인 전) 미정 — 3인 승인 전까지는 DB 적재 없이 JSON만 출력
+9. `feature/watcher-pr-reviews`(`pr_reviews`) — `GET /repos/{owner}/{repo}/pulls/{number}/reviews` 수집(8번과 호출 재사용). D4 확정(#44, 3인 승인 완료) — 11/14 마이그레이션 전까지는 DB 적재 없이 JSON만 출력(일정상 제약, 승인 여부와 무관)
 10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`), JSON 출력에서 전환
 11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도)
 
@@ -306,7 +306,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 12. `feature/watcher-quiz-generation` — DB 이벤트(오답·허용) 기준 Ollama 호출 → `quizzes` 적재
 
 **리스크**
-- 7·8·9번은 D2·D4가 11/17 전 확정되지 않으면 "이벤트화 없이 데이터만 생성"으로 범위를 좁혀 먼저 머지하고, 결정 나는 대로 후속 PR로 확장한다.
+- 7·8번은 D2가 11/17 전 확정되지 않으면 "이벤트화 없이 데이터만 생성"으로 범위를 좁혀 먼저 머지하고, 결정 나는 대로 후속 PR로 확장한다. (9번은 D4가 #44로 확정되어 더 이상 해당 없음)
 - 10번은 4~9번에서 다루는 이벤트 종류가 어느 정도 정해진 뒤에 붙인다(적재 순서·중복 방지 로직 재작업을 줄이기 위함).
 - DB 적재(11/17~)·Compose 통합(11/20~23)·퀴즈 생성(11/24~26)이 모두 이 PR들의 완료를 전제로 순차 진행되므로, CLI의 P2(13·14번)처럼 뒤로 미룰 여지가 없다. 유일하게 여유를 둘 수 있는 건 12번(퀴즈 생성)뿐이다.
 
