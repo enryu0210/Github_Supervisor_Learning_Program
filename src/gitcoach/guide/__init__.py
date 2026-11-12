@@ -165,17 +165,33 @@ def _stop_current(*, advance_queue: bool) -> str:
         # 이벤트 없이 사라지면 안 된다(#47-1, 01_cli.md 3-3 8번).
         _discard_queue(guide_state.queue[1:])
         state.clear()
-        return "가이드를 중단했어요."
+        return _stopped_message(snap.command_summary)
 
     guide_state.queue.pop(0)
     guide_state.step_index = 0
     guide_state.hint_count = 0
     if not guide_state.queue:
         state.clear()
-        return "가이드를 중단했어요."
+        return _stopped_message(snap.command_summary)
 
     state.save(guide_state)
     return f"이번 가이드는 건너뛰었어요.\n{_start_next(guide_state)}"
+
+
+def _stopped_message(command_summary: str) -> str:
+    """가이드를 중단해도 원래 명령이 사라진 게 아니라는 점을 알려준다 —
+    [2]를 고르는 순간 원래 명령은 이미 취소돼 있으므로(3-2 7번), 중단 후
+    아무 결과도 안 남으면 학생이 "하려던 일 자체가 증발했다"고 느끼기 쉽다
+    (11/12 피드백 반영). 같은 명령을 다시 입력하면 shim이 새 명령으로 보고
+    evaluate()를 다시 돌려 같은 선택 화면을 띄우므로(shim.run), 이 안내는
+    실제 동작과 일치한다."""
+    if not command_summary:
+        return "가이드를 중단했어요."
+    return (
+        "가이드를 중단했어요. "
+        f"원래 명령({command_summary})은 취소된 상태라, 다시 하려면 같은 명령을 "
+        "입력하면 이 선택 화면이 다시 떠요."
+    )
 
 
 def _advance(guide_state: GuideState, scenario: Scenario) -> str:
@@ -226,10 +242,27 @@ def _start_next(guide_state: GuideState) -> str:
         events.update_explanation(snap.event_id, explanation.text, explanation.llm_used)
 
     header = f"📘 가이드 시작: {scenario.title} (총 {len(scenario.steps)}단계)"
+    overview = _overview(scenario)
+    body = f"{header}\n{overview}\n\n" if overview else f"{header}\n"
     return (
         f"💡 왜 문제일까요?\n   {explanation.text}\n\n"
-        f"{header}\n{_format_step(scenario, guide_state, step)}"
+        f"{body}{_format_step(scenario, guide_state, step)}"
     )
+
+
+def _overview(scenario: Scenario) -> str | None:
+    """가이드 시작 화면에서 전체 단계를 먼저 보여준다(치트시트). 이미 아는
+    사람도 단계마다 힌트를 조금씩 공개하는 서스펜스 구조 때문에 중간에
+    포기하기 쉬웠다(11/12 피드백). hint까지만 보여주고 answer(구체적 명령)는
+    그대로 숨겨서, 패턴을 직접 채워 입력하는 원칙(3-3 1번)은 유지한다.
+    1단계뿐인 시나리오(R05·R06)는 아래 1/1과 중복이라 생략한다."""
+    if len(scenario.steps) <= 1:
+        return None
+    lines = [
+        f"   {i}) {step.instruction}\n      → {step.hint}"
+        for i, step in enumerate(scenario.steps, 1)
+    ]
+    return "전체 흐름:\n" + "\n".join(lines)
 
 
 def _format_step(scenario: Scenario, guide_state: GuideState, step) -> str:
