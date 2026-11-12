@@ -6,7 +6,9 @@ _VALUE_FLAGS: dict[str, set[str]] = {
     "commit": {"-m", "--message"},
 }
 
-_SHORT_MESSAGE_FLAG_RE = re.compile(r"-[a-zA-Z]*m.*")
+# m 앞에는 값을 받지 않는 commit 짧은 플래그만 올 수 있다. -F/-u/-S/-C/-c/-t는
+# 뒤 글자를 값으로 먹으므로 그 값 속 m을 메시지 플래그로 읽으면 안 된다(#56).
+_SHORT_MESSAGE_FLAG_RE = re.compile(r"-[apsnevqzio]*m.*")
 
 
 def parse(argv: list[str]) -> Command:
