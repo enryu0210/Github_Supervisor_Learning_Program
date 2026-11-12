@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
@@ -29,13 +30,21 @@ def load() -> GuideState | None:
     path = _state_path()
     if path is None or not path.exists():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
-    queue = [ViolationSnapshot(**item) for item in data["queue"]]
-    return GuideState(
-        queue=queue,
-        step_index=data["step_index"],
-        hint_count=data["hint_count"],
-    )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        queue = [ViolationSnapshot(**item) for item in data["queue"]]
+        return GuideState(
+            queue=queue,
+            step_index=data["step_index"],
+            hint_count=data["hint_count"],
+        )
+    except (json.JSONDecodeError, KeyError, TypeError):
+        # guide 진행 중 Ctrl+C로 save() 쓰기가 끼어들면 파일이 반쯤 써진 채로
+        # 남을 수 있다. 큐 내용을 복구할 수 없으니 guide_stopped 없이 포기하고
+        # 손상된 파일을 지운다 — 지우지 않으면 이 레포의 모든 git 명령이 계속
+        # 크래시한다(#64).
+        path.unlink()
+        return None
 
 
 def save(guide_state: GuideState) -> None:
@@ -48,7 +57,11 @@ def save(guide_state: GuideState) -> None:
         "step_index": guide_state.step_index,
         "hint_count": guide_state.hint_count,
     }
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    os.replace(tmp_path, path)
 
 
 def clear() -> None:
