@@ -104,3 +104,47 @@ def test_status_reflects_install_and_uninstall(tmp_path, monkeypatch) -> None:
     assert status["bash (~/.bash_profile)"] is True
     wrapper.uninstall()
     assert not any(wrapper.status().values())
+
+
+# ---- fail-open: gitcoach가 PATH에 없으면 실제 git으로 (이슈 #71) ----
+
+
+def test_bash_block_falls_back_to_real_git_when_gitcoach_missing() -> None:
+    assert "command -v gitcoach" in wrapper._BASH_BLOCK
+    assert "command git" in wrapper._BASH_BLOCK
+
+
+def test_powershell_block_falls_back_to_real_git_when_gitcoach_missing() -> None:
+    assert "Get-Command gitcoach" in wrapper._POWERSHELL_BLOCK
+    assert "Get-Command git" in wrapper._POWERSHELL_BLOCK
+
+
+def test_install_writes_bash_fallback_branch(tmp_path, monkeypatch) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    wrapper.install()
+    content = wrapper.BASHRC_PATH.read_text(encoding="utf-8")
+    assert "command -v gitcoach" in content
+    assert "command git" in content
+
+
+def test_install_writes_powershell_fallback_branch(tmp_path, monkeypatch) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    ps_profile = tmp_path / "profile.ps1"
+    monkeypatch.setattr(wrapper, "powershell_profile_path", lambda: ps_profile)
+    wrapper.install()
+    content = ps_profile.read_text(encoding="utf-8")
+    assert "Get-Command gitcoach" in content
+    assert "Get-Command git" in content
+
+
+def test_install_upgrades_old_block_to_fallback_version(tmp_path, monkeypatch) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    old_block = (
+        f'{wrapper._MARKER_START}\ngit() {{ gitcoach run -- "$@"; }}\n'
+        f"{wrapper._MARKER_END}\n"
+    )
+    wrapper.BASHRC_PATH.write_text(old_block, encoding="utf-8")
+    wrapper.install()
+    content = wrapper.BASHRC_PATH.read_text(encoding="utf-8")
+    assert content.count(wrapper._MARKER_START) == 1
+    assert "command git" in content

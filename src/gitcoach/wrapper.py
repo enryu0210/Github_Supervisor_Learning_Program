@@ -9,9 +9,18 @@ ZSHRC_PATH = Path.home() / ".zshrc"
 _MARKER_START = "# >>> gitcoach git wrapper >>>"
 _MARKER_END = "# <<< gitcoach git wrapper <<<"
 
-_BASH_BLOCK = f'{_MARKER_START}\ngit() {{ gitcoach run -- "$@"; }}\n{_MARKER_END}\n'
+_BASH_BLOCK = (
+    f"{_MARKER_START}\n"
+    'git() { if command -v gitcoach >/dev/null 2>&1; then gitcoach run -- "$@"; '
+    'else command git "$@"; fi; }\n'
+    f"{_MARKER_END}\n"
+)
 _POWERSHELL_BLOCK = (
-    f"{_MARKER_START}\nfunction git {{ & gitcoach run -- @args }}\n{_MARKER_END}\n"
+    f"{_MARKER_START}\n"
+    "function git { if (Get-Command gitcoach -ErrorAction SilentlyContinue) "
+    "{ & gitcoach run -- @args } else "
+    "{ & (Get-Command git -CommandType Application | Select-Object -First 1) @args } }\n"
+    f"{_MARKER_END}\n"
 )
 
 
