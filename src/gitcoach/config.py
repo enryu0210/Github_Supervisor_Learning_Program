@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import tomllib
@@ -169,6 +170,36 @@ def enable_rule(rule_id: str, *, repo_root: Path | None = _UNRESOLVED) -> None:
 def member() -> str | None:
     data = _load_toml(GLOBAL_CONFIG_PATH)
     return _as_str(data.get("member"), None)
+
+
+def set_member(login: str) -> None:
+    data = _load_toml(GLOBAL_CONFIG_PATH, strict=True)
+    data["member"] = login
+    _write_toml(GLOBAL_CONFIG_PATH, data)
+
+
+def detect_github_login() -> str | None:
+    """`gh api user`로 로그인을 추정한다. gh 미설치·인증 안 됨·네트워크 오류 등
+    실패 상황은 전부 호출자(cli.py)의 수동 입력 폴백으로 넘기기 위해 None만 반환한다."""
+    try:
+        result = subprocess.run(
+            ["gh", "api", "user"],
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        login = json.loads(result.stdout).get("login")
+    except (ValueError, AttributeError):
+        return None
+    if not isinstance(login, str) or not login:
+        return None
+    return login.lower()
 
 
 def ollama_settings() -> OllamaSettings:

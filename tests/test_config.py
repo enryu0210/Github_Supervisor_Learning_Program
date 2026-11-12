@@ -284,3 +284,64 @@ def test_disabled_rules_normalizes_lowercase_r03_and_still_excludes_it(
     _init_repo(tmp_path)
     (tmp_path / ".gitcoach.toml").write_text('disabled_rules = ["r03", "r05"]')
     assert config.disabled_rules() == {"R05"}
+
+
+# ---- set_member / detect_github_login (12번) ----
+
+
+def test_set_member_writes_and_reads_back(tmp_path, monkeypatch) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    config.set_member("octocat")
+    assert config.member() == "octocat"
+
+
+def test_set_member_preserves_ollama_settings(tmp_path, monkeypatch) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.set_ollama_settings(url="http://host:1234")
+    config.set_member("octocat")
+    assert config.member() == "octocat"
+    assert config.ollama_settings().url == "http://host:1234"
+
+
+def test_detect_github_login_parses_gh_output_lowercased(monkeypatch) -> None:
+    def fake_run(cmd, **kwargs):
+        assert cmd == ["gh", "api", "user"]
+        return subprocess.CompletedProcess(cmd, 0, stdout='{"login": "Octocat"}')
+
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    assert config.detect_github_login() == "octocat"
+
+
+def test_detect_github_login_returns_none_when_gh_not_installed(monkeypatch) -> None:
+    def fake_run(cmd, **kwargs):
+        raise FileNotFoundError()
+
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    assert config.detect_github_login() is None
+
+
+def test_detect_github_login_returns_none_on_nonzero_exit(monkeypatch) -> None:
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="not logged in")
+
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    assert config.detect_github_login() is None
+
+
+def test_detect_github_login_returns_none_on_invalid_json(monkeypatch) -> None:
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 0, stdout="not json")
+
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    assert config.detect_github_login() is None
+
+
+def test_detect_github_login_returns_none_when_login_field_missing(
+    monkeypatch,
+) -> None:
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 0, stdout="{}")
+
+    monkeypatch.setattr(config.subprocess, "run", fake_run)
+    assert config.detect_github_login() is None
