@@ -1,4 +1,6 @@
 import shutil
+import sys
+from pathlib import Path
 
 import httpx
 
@@ -33,3 +35,16 @@ def check_ollama() -> tuple[bool, str]:
 
 def check_wrapper() -> dict[str, bool]:
     return wrapper.status()
+
+
+def check_global_install() -> tuple[bool, str]:
+    """gitcoach가 프로젝트 .venv 안에만 설치됐는지 확인한다. pip install -e .로 설치하면
+    .venv를 수동 활성화해야 git 래퍼가 동작하므로, 터미널을 새로 열 때마다 코칭이
+    빠지는 문제가 생긴다. pipx install -e .로 설치하면 이 검사를 통과한다."""
+    if ".venv" in Path(sys.executable).parts:
+        message = (
+            "venv 안에 설치되어 있어요 — 터미널마다 활성화가 필요해요 "
+            "(pipx install -e . 로 다시 설치하면 항상 켜져 있어요)"
+        )
+        return False, message
+    return True, "전역 설치 확인됨 — 터미널을 새로 열어도 바로 동작해요"

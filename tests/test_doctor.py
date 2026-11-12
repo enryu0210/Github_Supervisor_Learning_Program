@@ -108,3 +108,21 @@ def test_check_wrapper_delegates_to_wrapper_status(monkeypatch) -> None:
         doctor.wrapper, "status", lambda: {"bash (~/.bashrc)": True, "zsh": False}
     )
     assert doctor.check_wrapper() == {"bash (~/.bashrc)": True, "zsh": False}
+
+
+# ---- check_global_install ----
+
+
+def test_check_global_install_pipx(monkeypatch) -> None:
+    monkeypatch.setattr(
+        doctor.sys, "executable", "/home/user/.local/pipx/venvs/gitcoach/bin/python"
+    )
+    ok, _ = doctor.check_global_install()
+    assert ok
+
+
+def test_check_global_install_project_venv(monkeypatch) -> None:
+    monkeypatch.setattr(doctor.sys, "executable", "/home/user/project/.venv/bin/python")
+    ok, message = doctor.check_global_install()
+    assert not ok
+    assert "pipx" in message

@@ -209,6 +209,9 @@ def init() -> None:
     ok, message = doctor_module.check_ollama()
     typer.echo(("✅ " if ok else "⚠️ ") + message)
 
+    global_ok, global_message = doctor_module.check_global_install()
+    typer.echo(("✅ " if global_ok else "⚠️ ") + global_message)
+
 
 @app.command()
 def doctor() -> None:
@@ -221,6 +224,9 @@ def doctor() -> None:
 
     ollama_ok, ollama_message = doctor_module.check_ollama()
     typer.echo(("✅ " if ollama_ok else "⚠️ ") + ollama_message)
+
+    global_ok, global_message = doctor_module.check_global_install()
+    typer.echo(("✅ " if global_ok else "⚠️ ") + global_message)
 
     wrapper_status = doctor_module.check_wrapper()
     for label, installed in wrapper_status.items():
