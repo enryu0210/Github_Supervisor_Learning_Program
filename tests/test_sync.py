@@ -1,9 +1,20 @@
+import sqlite3
 import subprocess
 
 import httpx
 import pytest
 
 from gitcoach import config, events, sync
+
+
+def _synced_flag(event_id: str) -> int:
+    conn = sqlite3.connect(events.DB_PATH)
+    try:
+        return conn.execute(
+            "SELECT synced FROM events WHERE id = ?", (event_id,)
+        ).fetchone()[0]
+    finally:
+        conn.close()
 
 
 def _init_repo(remote: str = "https://github.com/team/repo.git") -> None:
@@ -253,6 +264,124 @@ def test_push_events_raises_sync_error_on_malformed_response(
     monkeypatch.setattr(httpx, "post", fake_post)
     with pytest.raises(sync.SyncError):
         sync.push_events()
+
+
+def test_push_events_does_not_upload_pending_guided_event(
+    tmp_path, monkeypatch
+) -> None:
+    # 큐에서 아직 시작 안 한 guided(explanation=None, 결과 이벤트 없음)는
+    # 서버 적재가 on conflict do nothing이라 올리면 영원히 고쳐지지 않는다(#48)
+    _setup(tmp_path, monkeypatch)
+    pending = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(pending)
+    calls = []
+
+    def fake_post(url, *, json, headers, timeout):
+        calls.append(json)
+        raise AssertionError("보류 대상만 있을 때는 sync가 요청을 보내면 안 된다")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert calls == []
+    assert result.inserted == 0
+    assert result.duplicate == 0
+    assert _synced_flag(pending.id) == 0
+
+
+def test_push_events_uploads_guided_event_once_explanation_backfilled(
+    tmp_path, monkeypatch
+) -> None:
+    _setup(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(ev)
+    events.update_explanation(ev.id, "설명", False)
+
+    def fake_post(url, *, json, headers, timeout):
+        return _FakeResponse({"results": [{"id": ev.id, "status": "inserted"}]})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert result.inserted == 1
+    assert events.unsynced() == []
+
+
+def test_push_events_uploads_guided_event_once_terminal_event_recorded(
+    tmp_path, monkeypatch
+) -> None:
+    _setup(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(ev)
+    followup = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guide_stopped",
+        command_summary="x",
+        related_event_id=ev.id,
+    )
+    events.record(followup)
+
+    def fake_post(url, *, json, headers, timeout):
+        sent_ids = {e["id"] for e in json["events"]}
+        assert sent_ids == {ev.id, followup.id}
+        return _FakeResponse(
+            {
+                "results": [
+                    {"id": ev.id, "status": "inserted"},
+                    {"id": followup.id, "status": "inserted"},
+                ]
+            }
+        )
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert result.inserted == 2
+    assert events.unsynced() == []
+
+
+def test_push_events_batch_includes_eligible_events_even_with_pending_one_present(
+    tmp_path, monkeypatch
+) -> None:
+    _setup(tmp_path, monkeypatch)
+    pending = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(pending)
+    good_ids = _record_events(3, prefix="good")
+
+    def fake_post(url, *, json, headers, timeout):
+        ids_in_batch = [e["id"] for e in json["events"]]
+        assert pending.id not in ids_in_batch
+        return _FakeResponse(
+            {"results": [{"id": i, "status": "inserted"} for i in ids_in_batch]}
+        )
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    result = sync.push_events()
+    assert result.inserted == len(good_ids)
+    assert _synced_flag(pending.id) == 0
 
 
 class _FakeResponse:
