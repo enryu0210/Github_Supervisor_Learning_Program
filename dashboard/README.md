@@ -31,6 +31,19 @@ v0.1은 레포 맨 위 `samples/*.json`(스키마 v1 더미)을 `lib/data/mock/s
 npm run samples:sync   # samples/ 가 바뀌면 다시 실행하고 결과 파일을 커밋
 ```
 
+### 합성 데이터 (실데이터 연동 전까지)
+
+화면을 채우기 위해 3주치 합성 데이터(`lib/data/mock/synthetic.json`)를 함께 씁니다.
+멤버 5명, CLI·GitHub 위반 이벤트, PR·리뷰, 퀴즈가 들어 있고, 필드 이름은 스키마 v1·`samples/watcher/`·ERD와 같습니다.
+
+```bash
+npm run synthetic:gen  # scripts/gen-synthetic.mjs 를 고친 뒤 다시 생성 (고정 시드라 결과가 매번 같음)
+```
+
+- 날짜는 화면을 여는 날이 속한 주가 "이번 주"가 되도록 주 단위로 옮겨 보여 주고, 아직 오지 않은 시각의 기록은 숨깁니다.
+- `samples/` 20건은 계약 확인용이라 날짜를 옮기지 않습니다.
+- 11/19~20 `NEXT_PUBLIC_DATA_SOURCE=supabase` 로 바꾸면 합성 데이터는 쓰지 않습니다.
+
 ## 폴더
 
 | 경로 | 내용 |
@@ -39,13 +52,15 @@ npm run samples:sync   # samples/ 가 바뀌면 다시 실행하고 결과 파�
 | `components/` | 화면 공용 컴포넌트 |
 | `lib/data/` | 데이터 계층. **화면은 여기 함수만 호출합니다** (mock → Supabase 교체 지점) |
 | `lib/labels.ts` | 이벤트 값 → 화면 문구 |
+| `lib/user.ts` | 로그인 전 현재 사용자 |
+| `scripts/` | 샘플 복사(`sync-samples.mjs`)·합성 데이터 생성(`gen-synthetic.mjs`) |
 | `types/event.ts` | 이벤트 스키마 v1 타입 (`docs/guide/01_cli.md` 6절과 같음) |
 
 ## 환경변수
 
 | 이름 | 용도 | 시점 |
 |---|---|---|
-| `NEXT_PUBLIC_CURRENT_USER` | 로그인 전 "현재 사용자" (github_login) | v0.1 |
+| `NEXT_PUBLIC_CURRENT_USER` | 로그인 전 "현재 사용자" (github_login, 기본 `jiyoon-lim`) | v0.1 |
 | `NEXT_PUBLIC_DATA_SOURCE` | `mock` / `supabase` | mock 데이터 계층부터 |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase 연결 (anon 키만) | 11/19~20 |
 

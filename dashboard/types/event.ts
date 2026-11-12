@@ -72,6 +72,21 @@ export type GitCoachEvent = {
 };
 
 /**
+ * 규칙 기본 심각도 (01_cli.md 규칙 표). 집계(RuleStat.severity)는 이 값을 쓴다.
+ * 개별 이벤트의 severity 는 다를 수 있다 (예: R02 --force-with-lease 는 medium).
+ * R07(v0.2)은 아직 정해지지 않아 넣지 않았다. 없는 규칙은 이벤트 값으로 대신한다.
+ */
+export const RULE_DEFAULT_SEVERITY: Record<string, Severity> = {
+  R01: "high",
+  R02: "high",
+  R03: "high",
+  R04: "medium",
+  R05: "low",
+  R06: "low",
+  R08: "low",
+};
+
+/**
  * 타입 가드: 위반 발생 이벤트인가
  * 복구 가이드(guided + related_event_id → 원래 allowed)는 이미 센 위반의 후속 기록이므로 제외한다.
  */

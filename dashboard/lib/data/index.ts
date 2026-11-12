@@ -3,7 +3,7 @@
 // 샘플 JSON이나 Supabase를 화면에서 직접 부르지 않는다.
 //
 // 구현체 2개:
-//   - mockSource      (samples/*.json, 11/9~11/16)
+//   - mockSource      (samples/*.json + 합성 데이터 synthetic.json, 11/9~11/18)
 //   - supabaseSource  (DB 뷰, 11/19~20 이남주와 함께 추가)
 //
 // 아래 반환 타입의 필드 이름은 DB 뷰 컬럼과 같게 맞춘다(snake_case).
@@ -89,6 +89,7 @@ export type MemberActivity = {
    * 기간 안에 리뷰한 PR 수 (pr_reviews 기준, submitted_at KST).
    * - 같은 PR에 여러 번 리뷰해도 1로 센다
    * - PR 작성자 본인의 리뷰는 세지 않는다
+   * - APPROVED·CHANGES_REQUESTED·COMMENTED·DISMISSED 모두 센다 (PENDING은 watcher가 저장하지 않는다)
    */
   reviews_given: number;
   violation_count: number;
@@ -100,7 +101,7 @@ export type DailyCount = {
   violation_count: number;
 };
 
-/** 방치된 PR ( / 개요 ). 기준 일수는 DB 뷰 쪽과 맞춘다. */
+/** 방치된 PR ( / 개요 ). 열려 있고 마지막 활동 후 3일 이상 지난 PR (D3). idle_days 큰 순. */
 export type StalePr = {
   repo: string;
   pr_number: number;
@@ -146,6 +147,15 @@ export type QuizAttempt = {
 export interface DataSource {
   /** 위반 타임라인 ( /events ). 최신순. */
   getEvents(filter?: EventFilter): Promise<GitCoachEvent[]>;
+
+  /**
+   * 주어진 이벤트들에 연결된 후속 이벤트 (related_event_id 가 ids 안에 있는 것).
+   * 타임라인 카드 아래에 가이드 완료·중단, 복구 가이드를 붙일 때 쓴다. 오래된순.
+   */
+  getRelatedEvents(ids: string[]): Promise<GitCoachEvent[]>;
+
+  /** 이벤트·PR에 한 번이라도 나온 멤버(github_login) 목록. 필터 칩용. 가나다(알파벳)순. */
+  getMembers(): Promise<string[]>;
 
   /** 규칙별 위반 집계. /me 에서는 filter.members = [현재 사용자]로 부른다. */
   getRuleStats(filter?: EventFilter): Promise<RuleStat[]>;

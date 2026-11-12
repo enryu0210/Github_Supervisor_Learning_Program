@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CURRENT_USER } from "@/lib/user";
 
 /** 상단 메뉴. 순서와 이름은 docs/wireframes/README.md 기준 */
 const MENU = [
@@ -12,8 +13,6 @@ const MENU = [
   { href: "/rules", label: "규칙 도감" },
 ] as const;
 
-// v0.1: 로그인 전까지 현재 사용자를 설정값 하나로 고정한다 (웹 가이드 3-3)
-const CURRENT_USER = process.env.NEXT_PUBLIC_CURRENT_USER ?? "me";
 
 export default function Nav() {
   const pathname = usePathname();
