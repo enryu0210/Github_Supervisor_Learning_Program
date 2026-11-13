@@ -1,6 +1,6 @@
 # ERD — Supabase DB
 
-> 버전: **v1** (2026-11-08 확정) · 담당: 이남주(DB)
+> 버전: **v1.1** (2026-11-13, v1 2026-11-08 확정) · 담당: 이남주(DB)
 > 기준: 이벤트 JSON 계약은 [`docs/guide/01_cli.md` 6절](../guide/01_cli.md)(이벤트 스키마 v1)을 따른다. 이 문서는 테이블·DB 제약·점검 쿼리·인덱스·RLS·뷰의 기준이다.
 >
 > 테이블은 `supabase/migrations/`의 마이그레이션으로만 만든다(11/14~). 이 문서와 마이그레이션이 다르면 마이그레이션이 실제 상태다.
@@ -13,6 +13,7 @@ erDiagram
     teams ||--o{ repos : "소유"
     teams ||--o{ members : "소속"
     repos ||--o{ prs : "포함"
+    prs ||--o{ pr_reviews : "리뷰"
     repos ||..o{ events : "full_name = repo"
     members ||..o{ events : "github_login = member"
     events |o..o{ events : "related_event_id"
@@ -35,26 +36,35 @@ erDiagram
     repos {
         uuid id PK
         uuid team_id FK
-        text full_name UK "owner/name"
+        text full_name UK "owner/name, 소문자"
     }
     prs {
         uuid id PK
         uuid repo_id FK
         int number
         text title
-        text author "github_login"
-        text state
+        text author "github_login, 소문자"
+        text state "open, closed"
         timestamptz opened_at
         timestamptz merged_at "nullable"
-        text_array reviewers "github_login 목록"
+        text_array reviewers "github_login 목록, 소문자"
         timestamptz last_activity_at
+    }
+    pr_reviews {
+        bigint review_id PK "GitHub 리뷰 id"
+        uuid pr_id FK
+        text reviewer "github_login, 소문자"
+        text status "APPROVED, CHANGES_REQUESTED, COMMENTED, DISMISSED"
+        timestamptz submitted_at
+        text commit_sha
+        text html_url
     }
     events {
         uuid id PK "보내는 쪽이 만든 UUID"
         int schema_version "1"
         timestamptz occurred_at
         text source "cli, github"
-        text repo "owner/name"
+        text repo "owner/name, 소문자"
         text member "github_login, 소문자"
         text rule_id
         text severity "high, medium, low"
@@ -68,7 +78,7 @@ erDiagram
         timestamptz created_at
     }
     quizzes {
-        uuid id PK "CLI가 만든 UUID"
+        uuid id PK "watcher가 만든 UUID"
         uuid member_id FK
         text rule_id
         uuid source_event_id FK "nullable"
@@ -101,6 +111,7 @@ erDiagram
 | teams | repos | 1 : 0..N | `repos.team_id` | |
 | teams | members | 1 : 0..N | `members.team_id` | |
 | repos | prs | 1 : 0..N | `prs.repo_id` | `(repo_id, number)` UK |
+| prs | pr_reviews | 1 : 0..N | `pr_reviews.pr_id` | |
 | repos | events | 1 : 0..N | `full_name = repo` | FK 없음 |
 | members | events | 1 : 0..N | `github_login = member` | FK 없음 |
 | events | events | 0..1 : 0..N | `related_event_id` | FK 없음. 아래 "related_event_id" 참고 |
@@ -122,7 +133,7 @@ erDiagram
 |---|---|---|---|
 | id | uuid | PK | |
 | team_id | uuid | FK → teams | |
-| github_login | text | UK | **소문자만** |
+| github_login | text | UK | **소문자만**, 빈 값 금지 (`events.member`와 같은 규칙) |
 | display_name | text | | |
 | auth_user_id | uuid | UK | `auth.users.id`. GitHub 로그인 후 연결, RLS 판정에 사용 |
 
@@ -131,7 +142,7 @@ erDiagram
 |---|---|---|---|
 | id | uuid | PK | |
 | team_id | uuid | FK → teams | |
-| full_name | text | UK | `owner/name` |
+| full_name | text | UK | `owner/name`, 소문자 (CLI·watcher가 `lower()` 해서 기록하는 값과 맞춘다, `01_cli.md` 5절) |
 
 ### prs (watcher가 채움)
 | 컬럼 | 타입 | 키 | 비고 |
@@ -140,12 +151,25 @@ erDiagram
 | repo_id | uuid | FK → repos | |
 | number | int | | `(repo_id, number)` UK |
 | title | text | | PR 제목 (방치 PR 목록 표시용) |
-| author | text | | github_login |
-| state | text | | 값 목록은 watcher와 확정 예정 |
+| author | text | | github_login, 소문자 |
+| state | text | | `open`·`closed` (GitHub API 값). 머지 여부는 `merged_at`으로 판별 |
 | opened_at | timestamptz | | |
-| merged_at | timestamptz | | nullable |
-| reviewers | text[] | | github_login 목록 |
+| merged_at | timestamptz | | nullable. 값이 있으면 `state = 'closed'` |
+| reviewers | text[] | | 요청된 리뷰어 github_login 목록, 소문자 |
 | last_activity_at | timestamptz | | 방치 PR 판정 기준 |
+
+### pr_reviews (watcher가 채움)
+| 컬럼 | 타입 | 키 | 비고 |
+|---|---|---|---|
+| review_id | bigint | PK | GitHub 리뷰 id 그대로 (int 범위를 넘음) |
+| pr_id | uuid | FK → prs | watcher가 `repo`·`pr_number`로 찾아 넣는다 |
+| reviewer | text | | github_login, 소문자 |
+| status | text | | `APPROVED`·`CHANGES_REQUESTED`·`COMMENTED`·`DISMISSED` (API 값 그대로). `PENDING`은 저장하지 않는다 |
+| submitted_at | timestamptz | | not null |
+| commit_sha | text | | 40자 hex |
+| html_url | text | | |
+
+`prs.reviewers`는 "요청된 리뷰어"이고, 실제로 누가 언제 리뷰했는지는 `pr_reviews`로 센다(#44).
 
 ### events (CLI·watcher 공통 계약, 모든 통계의 원천)
 | 컬럼 | 타입 | 필수 | 비고 |
@@ -154,8 +178,8 @@ erDiagram
 | schema_version | int | ✔ | `1` |
 | occurred_at | timestamptz | ✔ | 타임존 오프셋 필수 (예: `+09:00`) |
 | source | text | ✔ | `cli` · `github` |
-| repo | text | ✔ | `owner/name` |
-| member | text | ✔ | github_login, **소문자만** |
+| repo | text | ✔ | `owner/name`, 소문자 |
+| member | text | ✔ | github_login, **소문자만**, 빈 값 금지 |
 | rule_id | text | ✔ | `R01` ~ (규칙 추가 가능성이 있어 값 제약 없음) |
 | severity | text | ✔ | `high` · `medium` · `low` |
 | action | text | ✔ | 아래 표 |
@@ -167,11 +191,11 @@ erDiagram
 | related_event_id | uuid | | 아래 표 |
 | created_at | timestamptz | | DB 적재 시각 (default now()) |
 
-### quizzes (CLI·watcher가 Ollama로 생성, 웹은 표시만)
+### quizzes (watcher가 Ollama로 생성해 직접 저장, 웹은 표시만)
 | 컬럼 | 타입 | 키 | 비고 |
 |---|---|---|---|
-| id | uuid | PK | CLI가 만든 UUID (재전송 중복 방지) |
-| member_id | uuid | FK → members | CLI는 `member`(github_login)를 보내고 DB 함수가 변환 |
+| id | uuid | PK | watcher가 만든 UUID (같은 퀴즈 재저장 방지, 만드는 방식은 퀴즈 작업 때 확정) |
+| member_id | uuid | FK → members | watcher가 `members`에서 `github_login`(소문자)으로 찾아 넣는다 |
 | rule_id | text | | |
 | source_event_id | uuid | FK → events | nullable |
 | question | text | | |
@@ -190,7 +214,7 @@ erDiagram
 | is_correct | boolean | | |
 | attempted_at | timestamptz | | default now() |
 
-> 퀴즈 저장 경로(Edge Function 구성 등)는 11/24 퀴즈 작업 때 다시 맞춘다.
+> 퀴즈는 watcher가 DB의 `events`(`source` = cli·github)를 읽어 출제하고 service key로 직접 저장한다. `ingest-events`는 이벤트만 받는다. 중복 방지·출제 근거 범위는 11/24 퀴즈 작업 때 정한다.
 
 ## events 규칙
 
@@ -209,7 +233,7 @@ erDiagram
 - 위반이 **없는** 명령은 기록하지 않는다. `events`에는 위반 기록만 있다.
 - 한 명령에 위반이 여러 개면 위반마다 이벤트가 하나씩(id 따로) 생긴다.
 - 단, R03이 다른 위반과 함께 걸려 [q]로 취소하면 R03 `blocked` 하나만 남기고 함께 걸린 위반은 기록하지 않는다(명령이 실행되지 않았으므로).
-- 가이드 결과(`guide_completed`·`guide_stopped`)의 `rule_id`·`severity`·`repo`·`member`·`branch`는 원래 `guided`와 같다.
+- 가이드 결과(`guide_completed`·`guide_stopped`)의 `rule_id`·`severity`·`repo`·`member`·`branch`·`command_summary`는 원래 `guided`와 같다(`01_cli.md` 6절).
 - 다른 규칙에서 Ctrl+C로 중간에 끈 명령은 이벤트가 남지 않는다.
 
 ### DB 제약 (어기면 적재 거절)
@@ -220,7 +244,11 @@ erDiagram
 | source ↔ action | `detected`는 `github`만, 나머지 action은 `cli`만 |
 | related_event_id | 가이드 결과면 not null, `guided`면 선택, 나머지는 null |
 | allowed | `explanation is null and llm_used = false` |
-| 소문자 | `member = lower(member)`, `github_login = lower(github_login)` |
+| github_login 형식 | `member`·`github_login` ~ `'^[a-z0-9][a-z0-9-]*$'` — 소문자, 빈 값 금지 |
+| repo 소문자 | `events.repo = lower(repo)`, `repos.full_name = lower(full_name)` |
+| prs | `state in ('open','closed')`, 머지된 PR은 `state = 'closed'`, `author`·`reviewers` 소문자 |
+| pr_reviews | `status` 값 목록(`PENDING` 없음), `reviewer` 소문자, `commit_sha` 40자 hex |
+| quizzes | `choices`는 2개 이상인 배열, `answer_index`는 그 범위 안 |
 
 ### 점검 쿼리로 보는 것 (제약 아님, 이상 데이터 탐지)
 
@@ -233,9 +261,17 @@ erDiagram
 
 ### 적재
 
-- 항상 `insert ... on conflict (id) do nothing`. **같은 이벤트를 다시 보내도 한 번만 저장된다.**
+- 다시 보내도 결과가 같아야 한다(멱등). 테이블마다 방식이 다르다.
+
+  | 테이블 | 방식 |
+  |---|---|
+  | `events`·`quizzes` | `insert ... on conflict (id) do nothing` — **같은 기록을 다시 보내도 한 번만 저장된다** |
+  | `prs` | `(repo_id, number)` 기준 upsert — 상태·`last_activity_at`이 바뀐다 |
+  | `pr_reviews` | `review_id` 기준 upsert — dismiss되면 상태가 바뀐다 |
 - CLI는 Edge Function `ingest-events`로 보낸다(학생 PC에 서버 키 없음). watcher는 서버 키로 직접 쓴다.
-- 같은 sync에서는 events를 먼저, quizzes를 나중에 넣는다.
+- `prs`를 먼저, `pr_reviews`를 나중에 넣는다(FK).
+- `quizzes`는 이미 DB에 있는 이벤트로만 출제하므로 `source_event_id` FK 순서가 자연히 지켜진다.
+- `repos`·`members`는 seed(`supabase/seed.sql`)로 먼저 등록한다. watcher는 `repo`로 `repos.id`를, 퀴즈는 `github_login`으로 `members.id`를 찾는다.
 
 ## 인덱스
 
@@ -245,6 +281,8 @@ erDiagram
 | events | `(member, occurred_at desc)` | 멤버별 기록 |
 | events | `(rule_id, action)` | 규칙 통계 |
 | events | `(related_event_id)` where not null | 가이드 짝 맞추기 |
+| pr_reviews | `(pr_id)` | PR별 리뷰 |
+| pr_reviews | `(reviewer, submitted_at desc)` | 멤버별 리뷰 활동 |
 | quizzes | `(member_id, created_at desc)` | 내 퀴즈 |
 | quiz_attempts | `(member_id, attempted_at desc)` | 내 풀이 기록 |
 
@@ -274,4 +312,5 @@ erDiagram
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
+| v1.1 | 2026-11-13 | 마이그레이션(`schema_v1`, `repo_lowercase`)과 맞춤: 퀴즈 생성·저장 주체를 watcher로 변경, `pr_reviews` 추가(D4, #44), `prs.state` 값·소문자 확정, `repo` 소문자 제약(#55), 적재 규칙 테이블별 분리, `member`·`github_login` 빈 값 금지(#47) |
 | v1 | 2026-11-08 | action을 v1 값 6개로 교체(v0 `blocked/ran/warned` 폐기), `related_event_id` 추가, `severity` 값 확정, `members.auth_user_id` 채택, `quizzes.created_at` 추가, 소문자·allowed 제약 확정, 퀴즈 id를 CLI 생성으로 변경, `prs.title` 추가, `quiz_attempts.correct` → `is_correct` (PR #12 리뷰) |
