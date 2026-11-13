@@ -4,6 +4,7 @@
 // - 격자·축은 1px 실선, 글자는 text/muted 색 (막대 색을 글자에 쓰지 않는다)
 // - 마우스를 올리면 값이 보이고(title), 같은 값은 숫자 라벨이나 표로도 볼 수 있다
 import Link from "next/link";
+import SegmentedBar from "@/components/SegmentedBar";
 import type { DailyCount, RuleStat } from "@/lib/data";
 import { RULE_NAMES } from "@/lib/labels";
 import { formatKstDay } from "@/lib/time";
@@ -129,12 +130,6 @@ export function DailyColumns({ days, today }: { days: DailyCount[]; today: strin
 /* 값이 셋이고 전체 대비 비율을 보는 것이라 도넛 대신 나눈 막대를 쓴다.        */
 /* ------------------------------------------------------------------ */
 
-const SEVERITY_PARTS: { key: Severity; label: string; fill: string; ink: string }[] = [
-  { key: "high", label: "높음", fill: "bg-high", ink: "text-white" },
-  { key: "medium", label: "보통", fill: "bg-medium", ink: "text-[#1d1f2c]" }, // 주황 위는 진한 글자가 더 잘 읽힌다
-  { key: "low", label: "낮음", fill: "bg-low", ink: "text-white" },
-];
-
 export function SeverityBar({ counts }: { counts: Record<Severity, number> }) {
   const total = counts.high + counts.medium + counts.low;
   if (total === 0) return null;
@@ -144,34 +139,13 @@ export function SeverityBar({ counts }: { counts: Record<Severity, number> }) {
         {total}
         <span className="ml-1 text-sm font-normal text-muted">건</span>
       </p>
-      <div
-        role="img"
-        aria-label={SEVERITY_PARTS.map((p) => `${p.label} ${counts[p.key]}건`).join(", ")}
-        className="flex h-7 gap-[2px]"
-      >
-        {SEVERITY_PARTS.filter((p) => counts[p.key] > 0).map((p) => {
-          const share = counts[p.key] / total;
-          return (
-            <div
-              key={p.key}
-              title={`${p.label} ${counts[p.key]}건 (${Math.round(share * 100)}%)`}
-              className={`flex items-center rounded-[4px] px-2 text-[11px] font-semibold ${p.fill} ${p.ink}`}
-              style={{ width: `${share * 100}%` }}
-            >
-              {/* 칸이 좁으면 숫자를 넣지 않는다 (아래 범례에 있음) */}
-              {share >= 0.12 && counts[p.key]}
-            </div>
-          );
-        })}
-      </div>
-      <ul className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-        {SEVERITY_PARTS.map((p) => (
-          <li key={p.key} className="flex items-center gap-1">
-            <i className={`inline-block h-2 w-2 rounded-sm ${p.fill}`} aria-hidden />
-            {p.label} <span className="text-text tabular-nums">{counts[p.key]}</span>
-          </li>
-        ))}
-      </ul>
+      <SegmentedBar
+        parts={[
+          { key: "high", label: "높음", value: counts.high, fill: "bg-high" },
+          { key: "medium", label: "보통", value: counts.medium, fill: "bg-medium", ink: "dark" }, // 주황 위는 진한 글자
+          { key: "low", label: "낮음", value: counts.low, fill: "bg-low" },
+        ]}
+      />
     </div>
   );
 }
