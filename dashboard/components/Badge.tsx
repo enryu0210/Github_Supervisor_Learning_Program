@@ -14,7 +14,7 @@ export default function Badge({ info, text }: { info?: LabelInfo; text?: string 
   return (
     <span
       title={info?.description}
-      className={`inline-block rounded-full px-2 py-px text-[11px] font-semibold ${
+      className={`inline-block shrink-0 rounded-full px-2 py-px whitespace-nowrap text-[11px] font-semibold ${
         info ? TONE_CLASS[info.tone] : "bg-low-bg text-low"
       }`}
     >
