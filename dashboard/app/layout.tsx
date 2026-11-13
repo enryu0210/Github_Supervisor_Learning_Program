@@ -12,7 +12,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ko" className="h-full antialiased">
       <body className="flex min-h-full flex-col">
         <Nav />
-        <main className="mx-auto w-full max-w-6xl flex-1 px-8 py-7">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-8 sm:py-7">{children}</main>
       </body>
     </html>
   );
