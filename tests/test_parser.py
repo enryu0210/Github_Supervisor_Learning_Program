@@ -47,6 +47,30 @@ def test_parse_commit_short_attached_message_mfix() -> None:
     assert cmd.message == "fix"
 
 
+def test_parse_commit_short_flag_with_attached_file_value_F() -> None:
+    cmd = parser.parse(["commit", "-Fcommit.txt"])
+    assert cmd.flags == ["-Fcommit.txt"]
+    assert cmd.message is None
+
+
+def test_parse_commit_short_flag_with_attached_untracked_mode_u() -> None:
+    cmd = parser.parse(["commit", "-unormal"])
+    assert cmd.flags == ["-unormal"]
+    assert cmd.message is None
+
+
+def test_parse_commit_short_flag_with_attached_gpg_keyid_S() -> None:
+    cmd = parser.parse(["commit", "-Smykey"])
+    assert cmd.flags == ["-Smykey"]
+    assert cmd.message is None
+
+
+def test_parse_commit_short_combined_flag_vm() -> None:
+    cmd = parser.parse(["commit", "-vm", "fix"])
+    assert cmd.flags == ["-v"]
+    assert cmd.message == "fix"
+
+
 def test_parse_unknown_subcommand_passes_through() -> None:
     cmd = parser.parse(["status"])
     assert cmd.subcommand == "status"
