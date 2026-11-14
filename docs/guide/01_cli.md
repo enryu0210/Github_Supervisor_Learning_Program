@@ -267,7 +267,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 | 커밋 메시지 규칙 위반 | PR 커밋 목록 조회 후 R06 재사용 | 공용 규칙 엔진 |
 | 방치된 PR | 마지막 활동 후 **3일**(11/9 임시 결정, N 확정 전까지 watcher·대시보드·DB 뷰 공통 사용) 이상 열린 PR | `prs.last_activity_at`. R08과 무관(성격이 다른 신호라 규칙 위반 통계에서 제외, 11/9 결정). 이 감지를 `detected` 이벤트로도 남길지·rule_id는 **추후 결정**(D2, 뷰 판정만으로 대체 가능, 11/17 전) |
 | 리뷰 쏠림 | 멤버별 리뷰 수 집계, 한 사람 비중이 기준 초과 시 알림 | 기준값은 팀이 정함. 방치 PR과 동일하게 규칙 위반 통계에서 제외(11/9 결정). rule_id·이벤트화 여부도 **추후 결정**(D2, 위와 동일 건) |
-| PR 리뷰 원본 기록(`pr_reviews`) | `GET /repos/{owner}/{repo}/pulls/{number}/reviews` | 이남주 DB 요청(11/9, 동의 완료). 리뷰 쏠림과 같은 호출 재사용. 필드: `review_id`(네이티브 id)·`repo`·`pr_number`·`reviewer`·`status`·`submitted_at`·`commit_sha`·`html_url`(`body` 제외). CLI·DB는 합의됐으나 웹(임지윤) 확인 전이라 3인 승인 기준으로는 **미정**(D4) |
+| PR 리뷰 원본 기록(`pr_reviews`) | `GET /repos/{owner}/{repo}/pulls/{number}/reviews` | 이남주 DB 요청(11/9, 동의 완료). 리뷰 쏠림과 같은 호출 재사용. 필드: `review_id`(네이티브 id)·`repo`·`pr_number`·`reviewer`·`status`·`submitted_at`·`commit_sha`·`html_url`(`body` 제외). CLI·DB·웹(임지윤) 3인 승인 완료 — **확정**(D4, #44, 11/12) |
 | main 직접 push, force push | Events API와 웹훅 payload 중 필요한 정보를 주는 쪽 확인 | 착수 때 먼저 검증 |
 
 - PR 데이터 수집 시 `author`·`reviewers`는 GitHub API 값을 그대로 쓰지 않고 `lower()` 처리 후 저장한다(DB `members.github_login` 소문자 제약과 매칭, 11/9 결정).
@@ -276,10 +276,39 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 - PR `title`은 항상 존재하는 값으로 보고 필수로 수집한다(방치 PR 목록 표시용, `prs.title` not null).
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`. `pr_reviews`도 동일 — 11/14 마이그레이션 전까지는 JSON으로 제공하고, 실제 DB 적재는 11/17~ 일정에 맞춘다(11/9 확정).
-- 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙).
+- 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙). `prs`·`pr_reviews`는 예외로 **upsert**다(`prs`는 `(repo_id, number)`, `pr_reviews`는 `review_id` 기준, `prs` 먼저 → `pr_reviews` 나중) — `do nothing`으로 넣으면 `state`·`last_activity_at`이 첫 값에 고정돼 방치 PR 판정이 틀어진다(D4, #44).
 - 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만. (`GITCOACH_SYNC_URL`·`GITCOACH_SYNC_TOKEN`은 CLI `sync`가 Edge Function을 호출할 때만 쓰는 값이라 watcher 목록에는 없다 — watcher는 service key로 DB에 직접 쓰므로 Edge Function을 거치지 않는다, #45 확정)
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
 - **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다. CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
+
+### 5-1. PR 쪼개기 (1 PR = 1 목적, ~300줄, base는 upstream develop, 11/12 추가)
+
+**1단계 (11/10~12) — PoC·공용 로직**
+1. `feature/watcher-project-skeleton` — watcher 패키지 골격, GitHub API 클라이언트(httpx+`GITHUB_TOKEN`), 폴링 루프 틀(수 분 단위), 로깅
+2. `feature/watcher-detected-event` — `detected` 이벤트 공통 로직: `uuid5(namespace, f"{rule_id}\x1f{repo.lower()}\x1f{entity}")` 생성기(6장), `repo`·`author`·`reviewer` `lower()` 정규화, JSON 파일 출력(`source="github"`)
+3. `feature/watcher-push-detection`(R01·R02) — Events API/웹훅 중 검증 결과로 확정한 방법으로 main 직접 push·force push 감지. entity: head SHA / `f"{branch}:{new_head_sha}"`
+   - **착수 전 확정 필요**: Events API(폴링)과 웹훅(수신 서버 필요) 중 선택. 전체 구조가 "수 분 단위 폴링"이라 Events API 쪽에 가깝지만 1번 PR 직후 별도로 검증·확정한다.
+
+**2단계 (11/13~16) — 규칙 재사용**
+4. `feature/watcher-rule-branch-naming`(R05) — 브랜치 목록 조회 + `is_valid_branch_name(name)`(`rules/r05_branch_naming.py`) 재사용, entity=브랜치명
+5. `feature/watcher-rule-pr-base`(R08) — 열린 PR의 base 확인, entity=`f"pr:{번호}"`, severity low
+6. `feature/watcher-rule-commit-message`(R06) — PR 커밋 목록 조회 + `is_valid_commit_message(msg)`(`gitcoach/commit_format.py`) 재사용, entity=커밋 SHA
+   - **공통 주의**: `check_branch_naming`/`check_commit_message`(각 `rules/r05_branch_naming.py`·`rules/r06_commit_message.py`)는 CLI 명령(`Command`/`Context`)을 해석하는 래퍼일 뿐, 실제 판정은 문자열 하나만 받는 순수 함수(`is_valid_branch_name`·`is_valid_commit_message`)로 이미 분리돼 있다. GitHub API에서 받은 브랜치명·커밋 메시지를 이 함수에 바로 넘기면 되므로, 가짜 `Command`/`Context` 어댑터는 필요 없다.
+
+**3단계 (11/17~19) — 방치 PR·리뷰·적재·Docker**
+7. `feature/watcher-stale-prs` — 방치 PR(3일 기준, D3) 감지, `prs.last_activity_at` 산출. rule_id/이벤트화 여부는 D2 미정 — 우선 JSON/DB 뷰용 데이터만 생성
+8. `feature/watcher-review-concentration` — 멤버별 리뷰 수 집계, 쏠림 알림. D2 미정이라 rule_id 없음(통계 집계 전용)
+9. `feature/watcher-pr-reviews`(`pr_reviews`) — `GET /repos/{owner}/{repo}/pulls/{number}/reviews` 수집(8번과 호출 재사용). D4 확정(#44, 3인 승인 완료) — 11/14 마이그레이션 전까지는 DB 적재 없이 JSON만 출력(일정상 제약, 승인 여부와 무관)
+10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`; `prs`·`pr_reviews`는 예외로 upsert, `prs` 먼저 → `pr_reviews` 나중), JSON 출력에서 전환
+11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도)
+
+**추후 (11/24~26, 상세 설계는 착수 시점에)**
+12. `feature/watcher-quiz-generation` — DB 이벤트(오답·허용) 기준 Ollama 호출 → `quizzes` 적재
+
+**리스크**
+- 7·8번은 D2가 11/17 전 확정되지 않으면 "이벤트화 없이 데이터만 생성"으로 범위를 좁혀 먼저 머지하고, 결정 나는 대로 후속 PR로 확장한다. (9번은 D4가 #44로 확정되어 더 이상 해당 없음)
+- 10번은 4~9번에서 다루는 이벤트 종류가 어느 정도 정해진 뒤에 붙인다(적재 순서·중복 방지 로직 재작업을 줄이기 위함).
+- DB 적재(11/17~)·Compose 통합(11/20~23)·퀴즈 생성(11/24~26)이 모두 이 PR들의 완료를 전제로 순차 진행되므로, CLI의 P2(13·14번)처럼 뒤로 미룰 여지가 없다. 유일하게 여유를 둘 수 있는 건 12번(퀴즈 생성)뿐이다.
 
 ## 6. 이벤트 스키마 v1 (내가 지키는 계약)
 ```json
