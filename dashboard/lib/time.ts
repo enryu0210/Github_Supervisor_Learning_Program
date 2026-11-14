@@ -35,6 +35,24 @@ export function thisWeekRange(now = new Date()): Range {
   return { from: kstMidnightIso(monday), to: kstMidnightIso(addDays(monday, 7)) };
 }
 
+/** 지난주(KST 월~일). 이번 주 범위를 7일 앞으로 옮긴 것 */
+export function lastWeekRange(now = new Date()): Range {
+  return shiftRange(thisWeekRange(now), -7);
+}
+
+/** 범위를 n일 옮기기 */
+export function shiftRange(r: Range, days: number): Range {
+  const ms = days * 24 * 60 * 60 * 1000;
+  const move = (iso: string) => new Date(Date.parse(iso) + ms + KST_OFFSET_MS).toISOString().replace(/\.\d{3}Z$/, "+09:00");
+  return { from: move(r.from), to: move(r.to) };
+}
+
+/** 화면 표시용 "11/9" (KST 날짜만) */
+export function formatKstDay(iso: string): string {
+  const [, m, d] = kstDate(iso).split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
 /** 화면 표시용 "11/10 14:20" (KST) */
 export function formatKst(iso: string): string {
   return new Intl.DateTimeFormat("ko-KR", {

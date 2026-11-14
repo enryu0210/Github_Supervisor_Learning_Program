@@ -109,14 +109,16 @@ const base = (m, rule, severity, branch, occurred) => ({
 });
 
 /** 가이드를 시작하고 결과(완료·중단·진행 중)를 남긴다. 결과 이벤트는 원래 값을 복사한다 (6절) */
+// 가이드 결과는 주별 비율이 정확히 나오도록 난수 대신 고르게 퍼지는 수열(황금비)을 쓴다
+const guideSeq = [0, 0, 0];
 function guide(g, week, isLatest) {
   events.push(g);
-  const completeP = [0.55, 0.7, 0.8][week];
-  const roll = rand();
+  const completeP = [0.5, 0.65, 0.75][week]; // 주마다 완료율이 오른다
+  const roll = (++guideSeq[week] * 0.6180339887 + week * 0.37) % 1;
   const t = Date.parse(g.occurred_at);
   if (roll < completeP) {
     events.push({ ...g, id: uuid4(), occurred_at: iso(plusMin(t, 3, 25)), action: "guide_completed", explanation: RULE[g.rule_id].done ?? "가이드를 완료함", llm_used: false, related_event_id: g.id });
-  } else if (roll < completeP + 0.2 || !isLatest) {
+  } else if (roll < completeP + 0.15 || !isLatest) {
     events.push({ ...g, id: uuid4(), occurred_at: iso(plusMin(t, 2, 15)), action: "guide_stopped", explanation: pick(STOP_REASON), llm_used: false, related_event_id: g.id });
   } // 나머지: 이번 주 마지막 날 가까이에서 시작해 아직 진행 중
 }
@@ -217,8 +219,12 @@ for (let week = 0; week < WEEKS; week++) {
 }
 
 // ---------------------------------------------------------------- watcher detected (source = github, uuid5)
-const detected = (m, rule, entity, t, extra) =>
-  events.push({ ...base(m, rule, RULE[rule]?.severity ?? "low", null, t), id: uuid5(`${rule}\x1f${REPO}\x1f${entity}`), source: "github", action: "detected", ...extra });
+// 같은 대상(브랜치·커밋·PR)은 uuid5 가 같아 watcher 가 한 번만 저장한다 → 이미 있으면 건너뛴다
+const detected = (m, rule, entity, t, extra) => {
+  const id = uuid5(`${rule}\x1f${REPO}\x1f${entity}`);
+  if (events.some((e) => e.id === id)) return;
+  events.push({ ...base(m, rule, RULE[rule]?.severity ?? "low", null, t), id, source: "github", action: "detected", ...extra });
+};
 for (const pr of prs) {
   const m = MEMBERS.find((x) => x.login === pr.author);
   const t = plusMin(Date.parse(pr.opened_at), 1, 10);
