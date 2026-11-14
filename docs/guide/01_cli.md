@@ -276,7 +276,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 - PR `title`은 항상 존재하는 값으로 보고 필수로 수집한다(방치 PR 목록 표시용, `prs.title` not null).
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`. `pr_reviews`도 동일 — 11/14 마이그레이션 전까지는 JSON으로 제공하고, 실제 DB 적재는 11/17~ 일정에 맞춘다(11/9 확정).
-- 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙).
+- 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙). `prs`·`pr_reviews`는 예외로 **upsert**다(`prs`는 `(repo_id, number)`, `pr_reviews`는 `review_id` 기준, `prs` 먼저 → `pr_reviews` 나중) — `do nothing`으로 넣으면 `state`·`last_activity_at`이 첫 값에 고정돼 방치 PR 판정이 틀어진다(D4, #44).
 - 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만. (`GITCOACH_SYNC_URL`·`GITCOACH_SYNC_TOKEN`은 CLI `sync`가 Edge Function을 호출할 때만 쓰는 값이라 watcher 목록에는 없다 — watcher는 service key로 DB에 직접 쓰므로 Edge Function을 거치지 않는다, #45 확정)
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
 - **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다. CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
@@ -299,7 +299,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 7. `feature/watcher-stale-prs` — 방치 PR(3일 기준, D3) 감지, `prs.last_activity_at` 산출. rule_id/이벤트화 여부는 D2 미정 — 우선 JSON/DB 뷰용 데이터만 생성
 8. `feature/watcher-review-concentration` — 멤버별 리뷰 수 집계, 쏠림 알림. D2 미정이라 rule_id 없음(통계 집계 전용)
 9. `feature/watcher-pr-reviews`(`pr_reviews`) — `GET /repos/{owner}/{repo}/pulls/{number}/reviews` 수집(8번과 호출 재사용). D4 확정(#44, 3인 승인 완료) — 11/14 마이그레이션 전까지는 DB 적재 없이 JSON만 출력(일정상 제약, 승인 여부와 무관)
-10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`), JSON 출력에서 전환
+10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`; `prs`·`pr_reviews`는 예외로 upsert, `prs` 먼저 → `pr_reviews` 나중), JSON 출력에서 전환
 11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도)
 
 **추후 (11/24~26, 상세 설계는 착수 시점에)**
