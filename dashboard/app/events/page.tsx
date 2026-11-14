@@ -36,10 +36,10 @@ export default function EventsPage({ searchParams }: PageProps<"/events">) {
 async function EventsContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   await connection(); // "오늘"·"이번 주"는 요청 시각 기준이라 미리 만들어 두지 않는다
-  const [events, all] = await Promise.all([data.getEvents(toEventFilter(sp)), data.getEvents()]);
+  const [events, members] = await Promise.all([data.getEvents(toEventFilter(sp)), data.getMembers()]);
   const list = readSort(sp) === "asc" ? [...events].reverse() : events;
-  const members = [...new Set(all.map((e) => e.member))].sort();
-  const rules = Object.keys(RULE_NAMES).filter((r) => all.some((e) => e.rule_id === r));
+  const related = await data.getRelatedEvents(list.map((e) => e.id));
+  const rules = Object.keys(RULE_NAMES).filter((r) => r !== "R07"); // R07은 v0.2
 
   const row = (key: ListKey, label: string, options: { value: string; label: string }[]) => {
     const selected = readList(sp, key);
@@ -81,6 +81,7 @@ async function EventsContent({ searchParams }: { searchParams: Promise<SearchPar
               active: readPeriod(sp) === p.value,
             }))}
           />
+          <p className="mt-1 text-[11px] text-muted">같은 위반이 CLI·GitHub에 각각 잡힐 수 있어요.</p>
           <p className="mt-1 flex justify-end gap-3 text-xs text-muted">
             <span>총 {events.length}건</span>
             <a href={hrefWith(sp, "sort", readSort(sp) === "asc" ? undefined : "asc")} className="font-semibold text-text">
@@ -93,7 +94,7 @@ async function EventsContent({ searchParams }: { searchParams: Promise<SearchPar
           <EmptyState message="조건에 맞는 위반이 없어요" resetHref={hasAnyFilter(sp) ? "/events" : undefined} />
         ) : (
           list.map((e) => (
-            <EventCard key={e.id} event={e} linked={all.filter((l) => l.related_event_id === e.id && l.action !== "guided")} />
+            <EventCard key={e.id} event={e} linked={related.filter((l) => l.related_event_id === e.id && l.action !== "guided")} />
           ))
         )}
       </div>
