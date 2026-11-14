@@ -153,13 +153,35 @@ def query(*, today: bool = False) -> list[Event]:
 def unsynced(limit: int = 100) -> list[Event]:
     """아직 서버로 보내지 않은 이벤트를 전역(레포 무관)으로 조회한다.
     `query()`/`log`와 달리 레포 필터가 없다 — 학생이 여러 팀 레포를 오갈 수 있어
-    `sync`는 로컬에 쌓인 모든 레포의 미전송 이벤트를 다 올려야 한다."""
+    `sync`는 로컬에 쌓인 모든 레포의 미전송 이벤트를 다 올려야 한다.
+
+    `action="guided"`인데 `explanation`이 아직 안 채워진 이벤트는 큐에서 아직
+    시작되지 않은 가이드일 수 있다(#48). 그 guided를 가리키는 결과 이벤트
+    (`guide_completed`/`guide_stopped`, `related_event_id`)가 하나도 없으면
+    아직 "진행 중"이므로 이번 sync에서는 올리지 않고 보류한다 — 서버 적재가
+    `on conflict (id) do nothing`이라 한 번 explanation=NULL로 올라가면 영원히
+    고쳐지지 않기 때문(`docs/architecture/data-flow.md` 공통 규칙). PR #43(템플릿
+    폴백)으로 가이드가 실제로 시작되면 explanation은 항상 즉시 채워지므로, NULL로
+    남는 건 전부 아직 시작 안 한 큐 항목뿐이다(#63 전제)."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     try:
         _ensure_schema(conn)
         cursor = conn.execute(
-            "SELECT * FROM events WHERE synced = 0 ORDER BY occurred_at, id LIMIT ?",
+            """
+            SELECT * FROM events
+            WHERE synced = 0
+              AND (
+                  action != 'guided'
+                  OR explanation IS NOT NULL
+                  OR EXISTS (
+                      SELECT 1 FROM events AS followup
+                      WHERE followup.related_event_id = events.id
+                  )
+              )
+            ORDER BY occurred_at, id
+            LIMIT ?
+            """,
             (limit,),
         )
         columns = [c[0] for c in cursor.description]

@@ -277,6 +277,124 @@ def test_mark_rejected_does_not_change_query_output(tmp_path, monkeypatch) -> No
     assert rows[0].id == ev.id
 
 
+def test_unsynced_includes_guided_event_with_explanation_filled(
+    tmp_path, monkeypatch
+) -> None:
+    # _start_next()가 실제로 하는 순서: explanation=None으로 record 후 나중에 backfill
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(ev)
+    events.update_explanation(ev.id, "설명", False)
+    assert {e.id for e in events.unsynced()} == {ev.id}
+
+
+def test_unsynced_defers_guided_event_with_null_explanation_and_no_followup(
+    tmp_path, monkeypatch
+) -> None:
+    # 큐에서 아직 차례가 안 와 시작하지 못한 guided — 진행 중이므로 보류(#48)
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ev = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(ev)
+    assert events.unsynced() == []
+
+
+def test_unsynced_includes_guided_event_once_followup_recorded(
+    tmp_path, monkeypatch
+) -> None:
+    # 시작도 못 하고 버려진 큐 항목도 결과 이벤트가 생기면(#47-1/#63) 보류를 푼다
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    for followup_action in ("guide_stopped", "guide_completed"):
+        ev = events.make_event(
+            rule_id="R01",
+            severity="high",
+            branch="main",
+            action="guided",
+            command_summary="x",
+        )
+        events.record(ev)
+        followup = events.make_event(
+            rule_id="R01",
+            severity="high",
+            branch="main",
+            action=followup_action,
+            command_summary="x",
+            related_event_id=ev.id,
+        )
+        events.record(followup)
+        assert {e.id for e in events.unsynced()} >= {ev.id, followup.id}
+
+
+def test_unsynced_never_defers_non_guided_actions_with_null_explanation(
+    tmp_path, monkeypatch
+) -> None:
+    # 필터가 action="guided" 외의 행(explanation이 원래 안 쓰이는 action들)에
+    # 실수로 걸리지 않는지 확인
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    ids = set()
+    for action in ("allowed", "blocked", "detected", "guide_completed"):
+        ev = events.make_event(
+            rule_id="R01",
+            severity="high",
+            branch="main",
+            action=action,
+            command_summary="x",
+        )
+        events.record(ev)
+        ids.add(ev.id)
+    assert {e.id for e in events.unsynced()} == ids
+
+
+def test_unsynced_defer_coexists_with_other_eligible_events(
+    tmp_path, monkeypatch
+) -> None:
+    # 보류 대상이 섞여 있어도 나머지 정상 이벤트는 그대로 나와야 한다(push_events()가 겪는 상황)
+    monkeypatch.chdir(tmp_path)
+    _init_repo()
+    _use_tmp_db(tmp_path, monkeypatch)
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    pending = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="guided",
+        command_summary="x",
+    )
+    events.record(pending)
+    normal = events.make_event(
+        rule_id="R01",
+        severity="high",
+        branch="main",
+        action="allowed",
+        command_summary="y",
+    )
+    events.record(normal)
+    assert {e.id for e in events.unsynced()} == {normal.id}
+
+
 def test_member_is_lowercased_even_if_config_has_mixed_case(
     tmp_path, monkeypatch
 ) -> None:
