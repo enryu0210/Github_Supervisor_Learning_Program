@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import httpx
 import pytest
 
@@ -20,7 +22,10 @@ class _FakeResponse:
 
 def _config() -> WatcherConfig:
     return WatcherConfig(
-        token="secret-token", repo="owner/repo", poll_interval_seconds=300
+        token="secret-token",
+        repo="owner/repo",
+        poll_interval_seconds=300,
+        events_dir=Path("./events"),
     )
 
 

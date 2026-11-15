@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from watcher import config
@@ -7,6 +9,7 @@ def _clear_env(monkeypatch) -> None:
     monkeypatch.delenv(config.TOKEN_ENV, raising=False)
     monkeypatch.delenv(config.REPO_ENV, raising=False)
     monkeypatch.delenv(config.POLL_INTERVAL_ENV, raising=False)
+    monkeypatch.delenv(config.EVENTS_DIR_ENV, raising=False)
 
 
 def test_load_config_raises_without_token(monkeypatch) -> None:
@@ -72,3 +75,20 @@ def test_load_config_raises_on_non_positive_poll_interval(monkeypatch) -> None:
     monkeypatch.setenv(config.POLL_INTERVAL_ENV, "0")
     with pytest.raises(config.WatcherConfigError):
         config.load_config()
+
+
+def test_load_config_uses_default_events_dir(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    cfg = config.load_config()
+    assert cfg.events_dir == Path(config.DEFAULT_EVENTS_DIR)
+
+
+def test_load_config_reads_custom_events_dir(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    monkeypatch.setenv(config.EVENTS_DIR_ENV, "/tmp/watcher-events")
+    cfg = config.load_config()
+    assert cfg.events_dir == Path("/tmp/watcher-events")
