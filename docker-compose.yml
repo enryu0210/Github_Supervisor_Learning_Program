@@ -13,6 +13,7 @@ services:
 
   watcher:
     build: ./watcher
+    restart: unless-stopped
     depends_on:
       - ollama
     environment:

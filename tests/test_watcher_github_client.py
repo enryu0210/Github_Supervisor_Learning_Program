@@ -67,3 +67,13 @@ def test_get_repo_returns_parsed_json(monkeypatch) -> None:
         httpx, "get", lambda *a, **k: _FakeResponse({"default_branch": "develop"})
     )
     assert github_client.get_repo(_config()) == {"default_branch": "develop"}
+
+
+def test_get_repo_raises_client_error_on_invalid_json(monkeypatch) -> None:
+    class _BadJsonResponse(_FakeResponse):
+        def json(self) -> dict:
+            raise ValueError("not json")
+
+    monkeypatch.setattr(httpx, "get", lambda *a, **k: _BadJsonResponse({}))
+    with pytest.raises(github_client.GitHubClientError):
+        github_client.get_repo(_config())

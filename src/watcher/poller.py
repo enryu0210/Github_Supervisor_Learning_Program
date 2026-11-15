@@ -36,4 +36,6 @@ def run_forever(
             poll_once(config)
         except GitHubClientError as exc:
             logger.warning("poll failed: %s", exc)
+        except Exception:
+            logger.exception("poll failed with an unexpected error")
         sleep(config.poll_interval_seconds)

@@ -45,3 +45,18 @@ def test_run_forever_continues_after_poll_failure(monkeypatch, caplog) -> None:
 
     assert len(calls) == 2
     assert "boom" in caplog.text
+
+
+def test_run_forever_continues_after_unexpected_error(monkeypatch, caplog) -> None:
+    calls = []
+
+    def fake_poll_once(cfg):
+        calls.append(cfg)
+        raise ValueError("unexpected")
+
+    monkeypatch.setattr(poller, "poll_once", fake_poll_once)
+    with caplog.at_level(logging.ERROR, logger="watcher"):
+        poller.run_forever(_config(), sleep=lambda s: None, max_iterations=2)
+
+    assert len(calls) == 2
+    assert "unexpected" in caplog.text
