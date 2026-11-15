@@ -12,7 +12,9 @@ services:
       - ollama-models:/root/.ollama
 
   watcher:
-    build: ./watcher
+    build:
+      context: .
+      dockerfile: watcher/Dockerfile
     depends_on:
       - ollama
     environment:
