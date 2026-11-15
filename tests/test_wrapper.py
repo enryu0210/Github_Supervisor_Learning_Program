@@ -25,6 +25,30 @@ def test_install_writes_both_bashrc_and_bash_profile(tmp_path, monkeypatch) -> N
     assert "bash (~/.bash_profile)" in installed
 
 
+def test_install_adds_bashrc_source_line_when_bash_profile_missing(
+    tmp_path, monkeypatch
+) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    wrapper.install()
+    content = wrapper.BASH_PROFILE_PATH.read_text(encoding="utf-8")
+    assert content.startswith(wrapper._BASHRC_SOURCE_LINE)
+    assert content.index(wrapper._BASHRC_SOURCE_LINE) < content.index(
+        wrapper._MARKER_START
+    )
+
+
+def test_install_does_not_inject_source_line_when_bash_profile_already_exists(
+    tmp_path, monkeypatch
+) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    wrapper.BASH_PROFILE_PATH.write_text("export PATH=foo\n", encoding="utf-8")
+    wrapper.install()
+    content = wrapper.BASH_PROFILE_PATH.read_text(encoding="utf-8")
+    assert wrapper._BASHRC_SOURCE_LINE not in content
+    assert "export PATH=foo" in content
+    assert "gitcoach run" in content
+
+
 def test_install_skips_zsh_when_zshrc_does_not_exist(tmp_path, monkeypatch) -> None:
     _set_paths(tmp_path, monkeypatch, zshrc_exists=False)
     installed = wrapper.install()
@@ -83,6 +107,17 @@ def test_uninstall_removes_block_but_keeps_other_content(tmp_path, monkeypatch) 
     assert "gitcoach run" not in content
     assert "export PATH=foo" in content
     assert "bash (~/.bashrc)" in removed
+
+
+def test_uninstall_keeps_bashrc_source_line_in_bash_profile(
+    tmp_path, monkeypatch
+) -> None:
+    _set_paths(tmp_path, monkeypatch)
+    wrapper.install()
+    wrapper.uninstall()
+    content = wrapper.BASH_PROFILE_PATH.read_text(encoding="utf-8")
+    assert wrapper._BASHRC_SOURCE_LINE in content
+    assert "gitcoach run" not in content
 
 
 def test_uninstall_when_nothing_installed_returns_empty_list(

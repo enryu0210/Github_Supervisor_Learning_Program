@@ -9,6 +9,12 @@ ZSHRC_PATH = Path.home() / ".zshrc"
 _MARKER_START = "# >>> gitcoach git wrapper >>>"
 _MARKER_END = "# <<< gitcoach git wrapper <<<"
 
+# ~/.bash_profile이 없던 환경에서 gitcoach가 새로 만들면, bash 로그인 쉘이
+# ~/.profile 같은 다른 프로필 파일을 더 이상 읽지 않아 ~/.bashrc 설정이 조용히
+# 사라진다(#78). 마커 블록 밖에 둬서 `uninstall()`로 래퍼를 지워도 이 보정은
+# 남도록 한다(블록 안에 두면 제거 시 문제가 재발함).
+_BASHRC_SOURCE_LINE = "[ -f ~/.bashrc ] && . ~/.bashrc\n"
+
 _BASH_BLOCK = (
     f"{_MARKER_START}\n"
     'git() { if command -v gitcoach >/dev/null 2>&1; then gitcoach run -- "$@"; '
@@ -92,6 +98,9 @@ def _has_block(path: Path) -> bool:
 def install() -> list[str]:
     installed = []
     for label, path in _bash_targets():
+        if path == BASH_PROFILE_PATH and not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(_BASHRC_SOURCE_LINE, encoding="utf-8")
         _upsert_block(path, _BASH_BLOCK)
         installed.append(label)
     if ZSHRC_PATH.exists():
