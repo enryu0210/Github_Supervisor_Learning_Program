@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 
 from watcher import poller
 from watcher.config import WatcherConfig
@@ -10,6 +11,7 @@ def _config(poll_interval_seconds: int = 7) -> WatcherConfig:
         token="secret-token",
         repo="owner/repo",
         poll_interval_seconds=poll_interval_seconds,
+        events_dir=Path("./events"),
     )
 
 
