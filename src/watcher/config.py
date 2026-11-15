@@ -1,12 +1,15 @@
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 TOKEN_ENV = "GITHUB_TOKEN"
 REPO_ENV = "GITHUB_REPO"
 POLL_INTERVAL_ENV = "WATCHER_POLL_INTERVAL_SECONDS"
+EVENTS_DIR_ENV = "WATCHER_EVENTS_DIR"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
+DEFAULT_EVENTS_DIR = "./events"
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -20,6 +23,7 @@ class WatcherConfig:
     token: str
     repo: str
     poll_interval_seconds: int
+    events_dir: Path
 
 
 def load_config() -> WatcherConfig:
@@ -37,9 +41,13 @@ def load_config() -> WatcherConfig:
         )
 
     poll_interval_seconds = _poll_interval()
+    events_dir = Path(os.environ.get(EVENTS_DIR_ENV) or DEFAULT_EVENTS_DIR)
 
     return WatcherConfig(
-        token=token, repo=repo, poll_interval_seconds=poll_interval_seconds
+        token=token,
+        repo=repo,
+        poll_interval_seconds=poll_interval_seconds,
+        events_dir=events_dir,
     )
 
 
