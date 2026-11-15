@@ -18,6 +18,7 @@ services:
     environment:
       OLLAMA_URL: http://ollama:11434  # 같은 Compose 네트워크에서는 서비스 이름으로 통신한다.
       GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_REPO: ${GITHUB_REPO}
       SUPABASE_URL: ${SUPABASE_URL}
       SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
 

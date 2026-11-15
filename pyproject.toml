@@ -22,4 +22,4 @@ dev = [
 gitcoach = "gitcoach.cli:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/gitcoach"]
+packages = ["src/gitcoach", "src/watcher"]
