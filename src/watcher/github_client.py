@@ -27,4 +27,10 @@ def get(config: WatcherConfig, path: str) -> httpx.Response:
 
 
 def get_repo(config: WatcherConfig) -> dict:
-    return get(config, f"/repos/{config.repo}").json()
+    response = get(config, f"/repos/{config.repo}")
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise GitHubClientError(
+            f"GitHub API 응답을 JSON으로 해석할 수 없어요: {exc}"
+        ) from exc
