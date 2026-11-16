@@ -82,3 +82,45 @@ def test_get_repo_raises_client_error_on_invalid_json(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "get", lambda *a, **k: _BadJsonResponse({}))
     with pytest.raises(github_client.GitHubClientError):
         github_client.get_repo(_config())
+
+
+def test_list_events_calls_events_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"type": "PushEvent"}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_events(_config())
+
+    assert calls == ["https://api.github.com/repos/owner/repo/events"]
+    assert result == [{"type": "PushEvent"}]
+
+
+def test_compare_commits_calls_compare_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse({"status": "diverged"})
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.compare_commits(_config(), "abc111", "def222")
+
+    assert calls == ["https://api.github.com/repos/owner/repo/compare/abc111...def222"]
+    assert result == {"status": "diverged"}
+
+
+def test_list_pulls_for_commit_calls_pulls_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"number": 1}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_pulls_for_commit(_config(), "abc111")
+
+    assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111/pulls"]
+    assert result == [{"number": 1}]
