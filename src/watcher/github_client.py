@@ -26,11 +26,26 @@ def get(config: WatcherConfig, path: str) -> httpx.Response:
     return response
 
 
-def get_repo(config: WatcherConfig) -> dict:
-    response = get(config, f"/repos/{config.repo}")
+def _json(response: httpx.Response) -> dict | list:
     try:
         return response.json()
     except ValueError as exc:
         raise GitHubClientError(
             f"GitHub API 응답을 JSON으로 해석할 수 없어요: {exc}"
         ) from exc
+
+
+def get_repo(config: WatcherConfig) -> dict:
+    return _json(get(config, f"/repos/{config.repo}"))
+
+
+def list_events(config: WatcherConfig) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/events"))
+
+
+def compare_commits(config: WatcherConfig, base: str, head: str) -> dict:
+    return _json(get(config, f"/repos/{config.repo}/compare/{base}...{head}"))
+
+
+def list_pulls_for_commit(config: WatcherConfig, sha: str) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/commits/{sha}/pulls"))
