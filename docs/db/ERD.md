@@ -1,6 +1,6 @@
 # ERD — Supabase DB
 
-> 버전: **v1.1** (2026-11-13, v1 2026-11-08 확정) · 담당: 이남주(DB)
+> 버전: **v1.2** (2026-11-17, v1 2026-11-08 확정) · 담당: 이남주(DB)
 > 기준: 이벤트 JSON 계약은 [`docs/guide/01_cli.md` 6절](../guide/01_cli.md)(이벤트 스키마 v1)을 따른다. 이 문서는 테이블·DB 제약·점검 쿼리·인덱스·RLS·뷰의 기준이다.
 >
 > 테이블은 `supabase/migrations/`의 마이그레이션으로만 만든다(11/14~). 이 문서와 마이그레이션이 다르면 마이그레이션이 실제 상태다.
@@ -12,6 +12,7 @@
 erDiagram
     teams ||--o{ repos : "소유"
     teams ||--o{ members : "소속"
+    teams ||--o{ ingest_tokens : "팀 토큰"
     repos ||--o{ prs : "포함"
     prs ||--o{ pr_reviews : "리뷰"
     repos ||..o{ events : "full_name = repo"
@@ -96,6 +97,13 @@ erDiagram
         boolean is_correct
         timestamptz attempted_at
     }
+    ingest_tokens {
+        text token_hash PK "sha256"
+        uuid team_id FK
+        text label
+        timestamptz created_at
+        timestamptz revoked_at
+    }
 ```
 
 점선 관계는 **FK 없이 문자열로 매칭**한다.
@@ -119,6 +127,7 @@ erDiagram
 | events | quizzes | 0..1 : 0..N | `quizzes.source_event_id` | 이벤트가 먼저 적재되어 있어야 함 |
 | quizzes | quiz_attempts | 1 : 0..N | `quiz_attempts.quiz_id` | |
 | members | quiz_attempts | 1 : 0..N | `quiz_attempts.member_id` | |
+| teams | ingest_tokens | 1 : 0..N | `ingest_tokens.team_id` | |
 
 ## 테이블
 
@@ -214,6 +223,17 @@ erDiagram
 | is_correct | boolean | | |
 | attempted_at | timestamptz | | default now() |
 
+### ingest_tokens (`ingest-events` 팀 토큰, 웹·CLI는 읽지 않음)
+| 컬럼 | 타입 | 키 | 비고 |
+|---|---|---|---|
+| token_hash | text | PK | 토큰의 sha256(16진수 소문자 64자). **원문 토큰은 저장하지 않는다** |
+| team_id | uuid | FK → teams | 이 토큰으로 올린 이벤트의 `repo`는 이 팀 레포여야 한다 |
+| label | text | | 누구에게·언제 준 토큰인지 |
+| created_at | timestamptz | | default now() |
+| revoked_at | timestamptz | | 값이 있으면 회수된 토큰(401) |
+
+> RLS를 켜고 정책을 두지 않는다. anon·authenticated는 테이블 권한도 없다. `ingest-events`(service role)만 조회한다.
+
 > 퀴즈는 watcher가 DB의 `events`(`source` = cli·github)를 읽어 출제하고 service key로 직접 저장한다. `ingest-events`는 이벤트만 받는다. 중복 방지·출제 근거 범위는 11/24 퀴즈 작업 때 정한다.
 
 ## events 규칙
@@ -269,6 +289,9 @@ erDiagram
   | `prs` | `(repo_id, number)` 기준 upsert — 상태·`last_activity_at`이 바뀐다 |
   | `pr_reviews` | `review_id` 기준 upsert — dismiss되면 상태가 바뀐다 |
 - CLI는 Edge Function `ingest-events`로 보낸다(학생 PC에 서버 키 없음). watcher는 서버 키로 직접 쓴다.
+  - `ingest-events`: `Authorization: Bearer <팀 토큰>` → `ingest_tokens`에서 팀 확인 → 형식 검사 → RPC `ingest_events(p_token_hash, p_events)`가 한 건씩 넣고 건별 결과(`inserted`·`duplicate`·`rejected` + 이유)를 돌려준다. 한 건이 거절돼도 나머지는 들어간다.
+  - `ingest-events`는 `source = 'cli'`만 받는다(`detected`는 watcher 직접 적재). 이벤트의 `repo`가 토큰의 팀 레포가 아니면 거절한다.
+  - RPC `ingest_events`는 service role만 실행할 수 있다(anon·authenticated 실행 권한 없음).
 - `prs`를 먼저, `pr_reviews`를 나중에 넣는다(FK).
 - `quizzes`는 이미 DB에 있는 이벤트로만 출제하므로 `source_event_id` FK 순서가 자연히 지켜진다.
 - `repos`·`members`는 seed(`supabase/seed.sql`)로 먼저 등록한다. watcher는 `repo`로 `repos.id`를, 퀴즈는 `github_login`으로 `members.id`를 찾는다.
@@ -312,5 +335,6 @@ erDiagram
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
+| v1.2 | 2026-11-17 | 마이그레이션 `ingest_events`와 맞춤: `ingest_tokens`(팀 토큰 해시) 추가, `ingest-events` 적재 동작(팀 레포 확인, `cli`만, 건별 결과) |
 | v1.1 | 2026-11-13 | 마이그레이션(`schema_v1`, `repo_lowercase`)과 맞춤: 퀴즈 생성·저장 주체를 watcher로 변경, `pr_reviews` 추가(D4, #44), `prs.state` 값·소문자 확정, `repo` 소문자 제약(#55), 적재 규칙 테이블별 분리, `member`·`github_login` 빈 값 금지(#47) |
 | v1 | 2026-11-08 | action을 v1 값 6개로 교체(v0 `blocked/ran/warned` 폐기), `related_event_id` 추가, `severity` 값 확정, `members.auth_user_id` 채택, `quizzes.created_at` 추가, 소문자·allowed 제약 확정, 퀴즈 id를 CLI 생성으로 변경, `prs.title` 추가, `quiz_attempts.correct` → `is_correct` (PR #12 리뷰) |

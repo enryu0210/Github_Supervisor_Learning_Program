@@ -1,0 +1,3 @@
+# Supabase CLI가 만드는 로컬 캐시
+.temp/
+.branches/
