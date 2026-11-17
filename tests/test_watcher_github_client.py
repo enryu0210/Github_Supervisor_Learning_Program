@@ -124,3 +124,31 @@ def test_list_pulls_for_commit_calls_pulls_endpoint(monkeypatch) -> None:
 
     assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111/pulls"]
     assert result == [{"number": 1}]
+
+
+def test_list_branches_calls_branches_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"name": "main"}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_branches(_config())
+
+    assert calls == ["https://api.github.com/repos/owner/repo/branches"]
+    assert result == [{"name": "main"}]
+
+
+def test_get_commit_calls_commit_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse({"author": {"login": "someone"}})
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.get_commit(_config(), "abc111")
+
+    assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111"]
+    assert result == {"author": {"login": "someone"}}

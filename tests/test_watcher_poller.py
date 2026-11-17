@@ -20,7 +20,7 @@ def _config(
 
 def _event(rule_id: str = "R01") -> Event:
     return Event(
-        id="11111111-1111-1111-1111-111111111111",
+        id=f"11111111-1111-1111-1111-{rule_id.lower():0>12}",
         schema_version=1,
         occurred_at="2026-11-16T00:00:00+09:00",
         source="github",
@@ -40,6 +40,7 @@ def test_poll_once_logs_default_branch(monkeypatch, caplog) -> None:
         poller.github_client, "get_repo", lambda cfg: {"default_branch": "develop"}
     )
     monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config())
     assert "owner/repo" in caplog.text
@@ -51,6 +52,7 @@ def test_poll_once_writes_detected_events(monkeypatch, caplog, tmp_path) -> None
         poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
     )
     monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [_event()])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -65,10 +67,51 @@ def test_poll_once_writes_no_file_when_no_violations(monkeypatch, tmp_path) -> N
         poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
     )
     monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
 
     poller.poll_once(_config(events_dir=tmp_path))
 
     assert list(tmp_path.iterdir()) == []
+
+
+def test_poll_once_writes_events_from_both_detectors(
+    monkeypatch, caplog, tmp_path
+) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(
+        poller.push_detection, "run", lambda cfg: [_event(rule_id="R01")]
+    )
+    monkeypatch.setattr(
+        poller.branch_naming, "run", lambda cfg: [_event(rule_id="R05")]
+    )
+
+    with caplog.at_level(logging.INFO, logger="watcher"):
+        poller.poll_once(_config(events_dir=tmp_path))
+
+    assert len(list(tmp_path.iterdir())) == 2
+    assert "R01" in caplog.text
+    assert "R05" in caplog.text
+
+
+def test_poll_once_writes_branch_naming_events_only(
+    monkeypatch, caplog, tmp_path
+) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(
+        poller.branch_naming, "run", lambda cfg: [_event(rule_id="R05")]
+    )
+
+    with caplog.at_level(logging.INFO, logger="watcher"):
+        poller.poll_once(_config(events_dir=tmp_path))
+
+    written = list(tmp_path.iterdir())
+    assert len(written) == 1
+    assert "R05" in caplog.text
 
 
 def test_run_forever_sleeps_between_ticks(monkeypatch) -> None:
