@@ -1,0 +1,7 @@
+# Supabase CLI 설정. 여기 적지 않은 항목은 CLI 기본값을 쓴다.
+project_id = "github_supervisor_learning_program"
+
+# CLI `gitcoach sync`는 Supabase JWT가 아니라 팀 토큰(Authorization: Bearer)으로 호출한다.
+# 토큰 확인은 함수 안에서 한다(public.ingest_tokens).
+[functions.ingest-events]
+verify_jwt = false
