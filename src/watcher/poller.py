@@ -3,7 +3,13 @@ import logging
 import time
 from collections.abc import Callable
 
-from watcher import branch_naming, events, github_client, push_detection
+from watcher import (
+    branch_naming,
+    events,
+    github_client,
+    pr_base_detection,
+    push_detection,
+)
 from watcher.config import WatcherConfig
 from watcher.github_client import GitHubClientError
 
@@ -12,8 +18,8 @@ logger = logging.getLogger("watcher")
 
 def poll_once(config: WatcherConfig) -> None:
     """한 번의 폴링 tick. 토큰·레포 설정이 실제로 GitHub API와 통하는지 확인하는
-    스모크 호출 후, push 감지(R01·R02)·브랜치명 감지(R05)를 돌려 위반이 있으면
-    이벤트로 저장한다."""
+    스모크 호출 후, push 감지(R01·R02)·브랜치명 감지(R05)·PR base 감지(R08)를
+    돌려 위반이 있으면 이벤트로 저장한다."""
     repo = github_client.get_repo(config)
     logger.info(
         "poll ok: %s (default_branch=%s)", config.repo, repo.get("default_branch")
@@ -24,6 +30,10 @@ def poll_once(config: WatcherConfig) -> None:
         logger.info("detected %s on %s -> %s", event.rule_id, event.branch, path)
 
     for event in branch_naming.run(config):
+        path = events.write_event(event, config.events_dir)
+        logger.info("detected %s on %s -> %s", event.rule_id, event.branch, path)
+
+    for event in pr_base_detection.run(config):
         path = events.write_event(event, config.events_dir)
         logger.info("detected %s on %s -> %s", event.rule_id, event.branch, path)
 
