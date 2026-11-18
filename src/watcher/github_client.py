@@ -49,3 +49,11 @@ def compare_commits(config: WatcherConfig, base: str, head: str) -> dict:
 
 def list_pulls_for_commit(config: WatcherConfig, sha: str) -> list[dict]:
     return _json(get(config, f"/repos/{config.repo}/commits/{sha}/pulls"))
+
+
+def list_branches(config: WatcherConfig) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/branches"))
+
+
+def get_commit(config: WatcherConfig, sha: str) -> dict:
+    return _json(get(config, f"/repos/{config.repo}/commits/{sha}"))
