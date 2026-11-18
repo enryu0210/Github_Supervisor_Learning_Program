@@ -126,6 +126,20 @@ def test_list_pulls_for_commit_calls_pulls_endpoint(monkeypatch) -> None:
     assert result == [{"number": 1}]
 
 
+def test_list_open_pulls_calls_pulls_endpoint_with_state_open(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"number": 1}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_open_pulls(_config())
+
+    assert calls == ["https://api.github.com/repos/owner/repo/pulls?state=open"]
+    assert result == [{"number": 1}]
+
+
 def test_list_branches_calls_branches_endpoint(monkeypatch) -> None:
     calls = []
 

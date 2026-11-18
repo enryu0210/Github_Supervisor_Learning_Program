@@ -57,3 +57,7 @@ def list_branches(config: WatcherConfig) -> list[dict]:
 
 def get_commit(config: WatcherConfig, sha: str) -> dict:
     return _json(get(config, f"/repos/{config.repo}/commits/{sha}"))
+
+
+def list_open_pulls(config: WatcherConfig) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/pulls?state=open"))
