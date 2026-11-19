@@ -27,6 +27,6 @@ insert into public.members (id, team_id, github_login) values
   ('6c0b8f3e-2d4a-4e7b-9c51-000000000201', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'enryu0210'),
   ('6c0b8f3e-2d4a-4e7b-9c51-000000000202', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'kkanooww'),
   ('6c0b8f3e-2d4a-4e7b-9c51-000000000203', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'zrrh8ngbrd-max'),
-  ('6c0b8f3e-2d4a-4e7b-9c51-000000000204', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'leafbell-sii')
-  -- 배포 담당 계정은 확인되면 '...000000000205'로 추가한다
+  ('6c0b8f3e-2d4a-4e7b-9c51-000000000204', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'leafbell-sii'),
+  ('6c0b8f3e-2d4a-4e7b-9c51-000000000205', '6c0b8f3e-2d4a-4e7b-9c51-000000000001', 'o-inguito')
 on conflict (github_login) do nothing;
