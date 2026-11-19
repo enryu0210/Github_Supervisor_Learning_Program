@@ -10,6 +10,7 @@ def _clear_env(monkeypatch) -> None:
     monkeypatch.delenv(config.REPO_ENV, raising=False)
     monkeypatch.delenv(config.POLL_INTERVAL_ENV, raising=False)
     monkeypatch.delenv(config.EVENTS_DIR_ENV, raising=False)
+    monkeypatch.delenv(config.PRS_PATH_ENV, raising=False)
 
 
 def test_load_config_raises_without_token(monkeypatch) -> None:
@@ -92,3 +93,20 @@ def test_load_config_reads_custom_events_dir(monkeypatch) -> None:
     monkeypatch.setenv(config.EVENTS_DIR_ENV, "/tmp/watcher-events")
     cfg = config.load_config()
     assert cfg.events_dir == Path("/tmp/watcher-events")
+
+
+def test_load_config_uses_default_prs_path(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    cfg = config.load_config()
+    assert cfg.prs_path == Path(config.DEFAULT_PRS_PATH)
+
+
+def test_load_config_reads_custom_prs_path(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    monkeypatch.setenv(config.PRS_PATH_ENV, "/tmp/watcher-prs.json")
+    cfg = config.load_config()
+    assert cfg.prs_path == Path("/tmp/watcher-prs.json")

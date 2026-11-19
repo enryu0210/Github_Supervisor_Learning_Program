@@ -63,5 +63,9 @@ def list_open_pulls(config: WatcherConfig) -> list[dict]:
     return _json(get(config, f"/repos/{config.repo}/pulls?state=open"))
 
 
+def list_all_pulls(config: WatcherConfig) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/pulls?state=all&per_page=100"))
+
+
 def list_pull_commits(config: WatcherConfig, number: int) -> list[dict]:
     return _json(get(config, f"/repos/{config.repo}/pulls/{number}/commits"))

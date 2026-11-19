@@ -26,6 +26,7 @@ def _config() -> WatcherConfig:
         repo="owner/repo",
         poll_interval_seconds=300,
         events_dir=Path("./events"),
+        prs_path=Path("./prs.json"),
     )
 
 
@@ -137,6 +138,22 @@ def test_list_open_pulls_calls_pulls_endpoint_with_state_open(monkeypatch) -> No
     result = github_client.list_open_pulls(_config())
 
     assert calls == ["https://api.github.com/repos/owner/repo/pulls?state=open"]
+    assert result == [{"number": 1}]
+
+
+def test_list_all_pulls_calls_pulls_endpoint_with_state_all(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"number": 1}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_all_pulls(_config())
+
+    assert calls == [
+        "https://api.github.com/repos/owner/repo/pulls?state=all&per_page=100"
+    ]
     assert result == [{"number": 1}]
 
 

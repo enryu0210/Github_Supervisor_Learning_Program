@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -8,13 +9,16 @@ from watcher.github_client import GitHubClientError
 
 
 def _config(
-    poll_interval_seconds: int = 7, events_dir: Path | None = None
+    poll_interval_seconds: int = 7,
+    events_dir: Path | None = None,
+    prs_path: Path | None = None,
 ) -> WatcherConfig:
     return WatcherConfig(
         token="secret-token",
         repo="owner/repo",
         poll_interval_seconds=poll_interval_seconds,
         events_dir=events_dir or Path("./events"),
+        prs_path=prs_path or Path("./prs.json"),
     )
 
 
@@ -43,6 +47,8 @@ def test_poll_once_logs_default_branch(monkeypatch, caplog) -> None:
     monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config())
     assert "owner/repo" in caplog.text
@@ -57,6 +63,8 @@ def test_poll_once_writes_detected_events(monkeypatch, caplog, tmp_path) -> None
     monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -74,6 +82,8 @@ def test_poll_once_writes_no_file_when_no_violations(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     poller.poll_once(_config(events_dir=tmp_path))
 
@@ -94,6 +104,8 @@ def test_poll_once_writes_events_from_both_detectors(
     )
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -115,6 +127,8 @@ def test_poll_once_writes_branch_naming_events_only(
     )
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -134,6 +148,8 @@ def test_poll_once_writes_pr_base_events_only(monkeypatch, caplog, tmp_path) -> 
         poller.pr_base_detection, "run", lambda cfg: [_event(rule_id="R08")]
     )
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -155,6 +171,8 @@ def test_poll_once_writes_commit_message_events_only(
     monkeypatch.setattr(
         poller.commit_message, "run", lambda cfg: [_event(rule_id="R06")]
     )
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -180,10 +198,49 @@ def test_poll_once_writes_events_from_all_detectors(monkeypatch, tmp_path) -> No
     monkeypatch.setattr(
         poller.commit_message, "run", lambda cfg: [_event(rule_id="R06")]
     )
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
 
     poller.poll_once(_config(events_dir=tmp_path))
 
     assert len(list(tmp_path.iterdir())) == 4
+
+
+def test_poll_once_writes_prs_snapshot(monkeypatch, caplog, tmp_path) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    pr_record = {"repo": "owner/repo", "number": 1, "state": "open"}
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [pr_record])
+
+    prs_path = tmp_path / "prs.json"
+    with caplog.at_level(logging.INFO, logger="watcher"):
+        poller.poll_once(_config(events_dir=tmp_path / "events", prs_path=prs_path))
+
+    assert json.loads(prs_path.read_text(encoding="utf-8")) == [pr_record]
+    assert "1건" in caplog.text
+
+
+def test_poll_once_overwrites_prs_snapshot_when_empty(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+
+    prs_path = tmp_path / "prs.json"
+    prs_path.write_text(json.dumps([{"number": 1}]), encoding="utf-8")
+
+    poller.poll_once(_config(events_dir=tmp_path / "events", prs_path=prs_path))
+
+    assert json.loads(prs_path.read_text(encoding="utf-8")) == []
 
 
 def test_run_forever_sleeps_between_ticks(monkeypatch) -> None:
