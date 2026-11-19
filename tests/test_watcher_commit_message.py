@@ -18,12 +18,17 @@ def _pr(*, number: int = 1, head: str = "feature/cli-x") -> dict:
 
 
 def _commit(
-    *, sha: str = "a" * 40, message: str, author: str | None = "hoil-lim"
+    *,
+    sha: str = "a" * 40,
+    message: str,
+    author: str | None = "hoil-lim",
+    parents: list[dict] | None = None,
 ) -> dict:
     return {
         "sha": sha,
         "commit": {"message": message},
         "author": {"login": author} if author is not None else None,
+        "parents": parents if parents is not None else [{"sha": "p" * 40}],
     }
 
 
@@ -81,6 +86,25 @@ def test_check_commit_skips_valid_subject_with_body() -> None:
 def test_check_commit_flags_invalid_subject_even_with_valid_looking_body() -> None:
     message = "fix login\n\nfeat(cli): this line is in the body, not the subject"
     event = commit_message.check_commit("owner/repo", _pr(), _commit(message=message))
+
+    assert event is not None
+
+
+def test_check_commit_skips_merge_commit_with_multiple_parents() -> None:
+    event = commit_message.check_commit(
+        "owner/repo",
+        _pr(),
+        _commit(
+            message="Merge branch 'develop' into feature/x",
+            parents=[{"sha": "p" * 40}, {"sha": "q" * 40}],
+        ),
+    )
+
+    assert event is None
+
+
+def test_check_commit_flags_empty_message_without_crashing() -> None:
+    event = commit_message.check_commit("owner/repo", _pr(), _commit(message=""))
 
     assert event is not None
 
