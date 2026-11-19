@@ -154,6 +154,20 @@ def test_list_branches_calls_branches_endpoint(monkeypatch) -> None:
     assert result == [{"name": "main"}]
 
 
+def test_list_pull_commits_calls_commits_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"sha": "abc111"}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_pull_commits(_config(), 1)
+
+    assert calls == ["https://api.github.com/repos/owner/repo/pulls/1/commits"]
+    assert result == [{"sha": "abc111"}]
+
+
 def test_get_commit_calls_commit_endpoint(monkeypatch) -> None:
     calls = []
 
