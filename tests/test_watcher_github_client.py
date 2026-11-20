@@ -27,6 +27,7 @@ def _config() -> WatcherConfig:
         poll_interval_seconds=300,
         events_dir=Path("./events"),
         prs_path=Path("./prs.json"),
+        review_concentration_path=Path("./review_concentration.json"),
     )
 
 
@@ -197,3 +198,17 @@ def test_get_commit_calls_commit_endpoint(monkeypatch) -> None:
 
     assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111"]
     assert result == {"author": {"login": "someone"}}
+
+
+def test_list_pull_reviews_calls_reviews_endpoint(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"user": {"login": "someone"}, "state": "APPROVED"}])
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    result = github_client.list_pull_reviews(_config(), 1)
+
+    assert calls == ["https://api.github.com/repos/owner/repo/pulls/1/reviews"]
+    assert result == [{"user": {"login": "someone"}, "state": "APPROVED"}]
