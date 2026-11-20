@@ -11,6 +11,7 @@ def _clear_env(monkeypatch) -> None:
     monkeypatch.delenv(config.POLL_INTERVAL_ENV, raising=False)
     monkeypatch.delenv(config.EVENTS_DIR_ENV, raising=False)
     monkeypatch.delenv(config.PRS_PATH_ENV, raising=False)
+    monkeypatch.delenv(config.REVIEW_CONCENTRATION_PATH_ENV, raising=False)
 
 
 def test_load_config_raises_without_token(monkeypatch) -> None:
@@ -110,3 +111,26 @@ def test_load_config_reads_custom_prs_path(monkeypatch) -> None:
     monkeypatch.setenv(config.PRS_PATH_ENV, "/tmp/watcher-prs.json")
     cfg = config.load_config()
     assert cfg.prs_path == Path("/tmp/watcher-prs.json")
+
+
+def test_load_config_uses_default_review_concentration_path(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    cfg = config.load_config()
+    assert cfg.review_concentration_path == Path(
+        config.DEFAULT_REVIEW_CONCENTRATION_PATH
+    )
+
+
+def test_load_config_reads_custom_review_concentration_path(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    monkeypatch.setenv(config.TOKEN_ENV, "ghp_test")
+    monkeypatch.setenv(config.REPO_ENV, "owner/repo")
+    monkeypatch.setenv(
+        config.REVIEW_CONCENTRATION_PATH_ENV, "/tmp/watcher-review-concentration.json"
+    )
+    cfg = config.load_config()
+    assert cfg.review_concentration_path == Path(
+        "/tmp/watcher-review-concentration.json"
+    )

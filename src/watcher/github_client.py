@@ -69,3 +69,7 @@ def list_all_pulls(config: WatcherConfig) -> list[dict]:
 
 def list_pull_commits(config: WatcherConfig, number: int) -> list[dict]:
     return _json(get(config, f"/repos/{config.repo}/pulls/{number}/commits"))
+
+
+def list_pull_reviews(config: WatcherConfig, number: int) -> list[dict]:
+    return _json(get(config, f"/repos/{config.repo}/pulls/{number}/reviews"))

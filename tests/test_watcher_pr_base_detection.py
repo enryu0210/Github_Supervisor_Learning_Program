@@ -11,6 +11,7 @@ def _config() -> WatcherConfig:
         poll_interval_seconds=300,
         events_dir=Path("./events"),
         prs_path=Path("./prs.json"),
+        review_concentration_path=Path("./review_concentration.json"),
     )
 
 
