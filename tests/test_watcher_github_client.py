@@ -38,7 +38,7 @@ def test_get_sends_auth_header_and_base_url(monkeypatch) -> None:
         calls.append((url, headers))
         return _FakeResponse({})
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     github_client.get(_config(), "/repos/owner/repo")
 
     assert calls == [
@@ -56,14 +56,14 @@ def test_get_raises_on_http_error(monkeypatch) -> None:
     def raise_error(*a, **k):
         raise httpx.ConnectError("no network")
 
-    monkeypatch.setattr(httpx, "get", raise_error)
+    monkeypatch.setattr(github_client._client, "get", raise_error)
     with pytest.raises(github_client.GitHubClientError):
         github_client.get(_config(), "/repos/owner/repo")
 
 
 def test_get_raises_on_http_status_error(monkeypatch) -> None:
     monkeypatch.setattr(
-        httpx, "get", lambda *a, **k: _FakeResponse({}, status_code=404)
+        github_client._client, "get", lambda *a, **k: _FakeResponse({}, status_code=404)
     )
     with pytest.raises(github_client.GitHubClientError):
         github_client.get(_config(), "/repos/owner/repo")
@@ -71,7 +71,9 @@ def test_get_raises_on_http_status_error(monkeypatch) -> None:
 
 def test_get_repo_returns_parsed_json(monkeypatch) -> None:
     monkeypatch.setattr(
-        httpx, "get", lambda *a, **k: _FakeResponse({"default_branch": "develop"})
+        github_client._client,
+        "get",
+        lambda *a, **k: _FakeResponse({"default_branch": "develop"}),
     )
     assert github_client.get_repo(_config()) == {"default_branch": "develop"}
 
@@ -81,7 +83,9 @@ def test_get_repo_raises_client_error_on_invalid_json(monkeypatch) -> None:
         def json(self) -> dict:
             raise ValueError("not json")
 
-    monkeypatch.setattr(httpx, "get", lambda *a, **k: _BadJsonResponse({}))
+    monkeypatch.setattr(
+        github_client._client, "get", lambda *a, **k: _BadJsonResponse({})
+    )
     with pytest.raises(github_client.GitHubClientError):
         github_client.get_repo(_config())
 
@@ -93,7 +97,7 @@ def test_list_events_calls_events_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse([{"type": "PushEvent"}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_events(_config())
 
     assert calls == ["https://api.github.com/repos/owner/repo/events"]
@@ -107,7 +111,7 @@ def test_compare_commits_calls_compare_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse({"status": "diverged"})
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.compare_commits(_config(), "abc111", "def222")
 
     assert calls == ["https://api.github.com/repos/owner/repo/compare/abc111...def222"]
@@ -121,7 +125,7 @@ def test_list_pulls_for_commit_calls_pulls_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse([{"number": 1}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_pulls_for_commit(_config(), "abc111")
 
     assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111/pulls"]
@@ -135,7 +139,7 @@ def test_list_open_pulls_calls_pulls_endpoint_with_state_open(monkeypatch) -> No
         calls.append(url)
         return _FakeResponse([{"number": 1}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_open_pulls(_config())
 
     assert calls == ["https://api.github.com/repos/owner/repo/pulls?state=open"]
@@ -149,7 +153,7 @@ def test_list_all_pulls_calls_pulls_endpoint_with_state_all(monkeypatch) -> None
         calls.append(url)
         return _FakeResponse([{"number": 1}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_all_pulls(_config())
 
     assert calls == [
@@ -165,7 +169,7 @@ def test_list_branches_calls_branches_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse([{"name": "main"}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_branches(_config())
 
     assert calls == ["https://api.github.com/repos/owner/repo/branches"]
@@ -179,7 +183,7 @@ def test_list_pull_commits_calls_commits_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse([{"sha": "abc111"}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_pull_commits(_config(), 1)
 
     assert calls == ["https://api.github.com/repos/owner/repo/pulls/1/commits"]
@@ -193,7 +197,7 @@ def test_get_commit_calls_commit_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse({"author": {"login": "someone"}})
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.get_commit(_config(), "abc111")
 
     assert calls == ["https://api.github.com/repos/owner/repo/commits/abc111"]
@@ -207,7 +211,7 @@ def test_list_pull_reviews_calls_reviews_endpoint(monkeypatch) -> None:
         calls.append(url)
         return _FakeResponse([{"user": {"login": "someone"}, "state": "APPROVED"}])
 
-    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_pull_reviews(_config(), 1)
 
     assert calls == ["https://api.github.com/repos/owner/repo/pulls/1/reviews"]
