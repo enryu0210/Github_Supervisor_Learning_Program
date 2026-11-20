@@ -9,11 +9,13 @@ POLL_INTERVAL_ENV = "WATCHER_POLL_INTERVAL_SECONDS"
 EVENTS_DIR_ENV = "WATCHER_EVENTS_DIR"
 PRS_PATH_ENV = "WATCHER_PRS_PATH"
 REVIEW_CONCENTRATION_PATH_ENV = "WATCHER_REVIEW_CONCENTRATION_PATH"
+PR_REVIEWS_PATH_ENV = "WATCHER_PR_REVIEWS_PATH"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
 DEFAULT_EVENTS_DIR = "./events"
 DEFAULT_PRS_PATH = "./prs.json"
 DEFAULT_REVIEW_CONCENTRATION_PATH = "./review_concentration.json"
+DEFAULT_PR_REVIEWS_PATH = "./pr_reviews.json"
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -30,6 +32,7 @@ class WatcherConfig:
     events_dir: Path
     prs_path: Path
     review_concentration_path: Path
+    pr_reviews_path: Path
 
 
 def load_config() -> WatcherConfig:
@@ -53,6 +56,9 @@ def load_config() -> WatcherConfig:
         os.environ.get(REVIEW_CONCENTRATION_PATH_ENV)
         or DEFAULT_REVIEW_CONCENTRATION_PATH
     )
+    pr_reviews_path = Path(
+        os.environ.get(PR_REVIEWS_PATH_ENV) or DEFAULT_PR_REVIEWS_PATH
+    )
 
     return WatcherConfig(
         token=token,
@@ -61,6 +67,7 @@ def load_config() -> WatcherConfig:
         events_dir=events_dir,
         prs_path=prs_path,
         review_concentration_path=review_concentration_path,
+        pr_reviews_path=pr_reviews_path,
     )
 
 
