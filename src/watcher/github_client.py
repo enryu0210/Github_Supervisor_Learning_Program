@@ -5,6 +5,10 @@ from watcher.config import WatcherConfig
 BASE_URL = "https://api.github.com"
 TIMEOUT = 10.0
 
+# 모듈 전역으로 재사용 — 매 호출마다 TCP+TLS를 새로 맺으면 PR당 리뷰 조회처럼
+# 한 틱에 수십~백여 회 연속 호출될 때 타임아웃이 잦아진다(keep-alive로 완화).
+_client = httpx.Client()
+
 
 class GitHubClientError(Exception):
     pass
@@ -12,7 +16,7 @@ class GitHubClientError(Exception):
 
 def get(config: WatcherConfig, path: str) -> httpx.Response:
     try:
-        response = httpx.get(
+        response = _client.get(
             f"{BASE_URL}{path}",
             headers={
                 "Authorization": f"Bearer {config.token}",
