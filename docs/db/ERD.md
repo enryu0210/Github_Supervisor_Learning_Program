@@ -1,6 +1,6 @@
 # ERD — Supabase DB
 
-> 버전: **v1.3** (2026-11-19, v1 2026-11-08 확정) · 담당: 이남주(DB)
+> 버전: **v1.4** (2026-11-20, v1 2026-11-08 확정) · 담당: 이남주(DB)
 > 기준: 이벤트 JSON 계약은 [`docs/guide/01_cli.md` 6절](../guide/01_cli.md)(이벤트 스키마 v1)을 따른다. 이 문서는 테이블·DB 제약·점검 쿼리·인덱스·RLS·뷰의 기준이다.
 >
 > 테이블은 `supabase/migrations/`의 마이그레이션으로만 만든다(11/14~). 이 문서와 마이그레이션이 다르면 마이그레이션이 실제 상태다.
@@ -331,6 +331,9 @@ erDiagram
 - `auth.users.raw_user_meta_data`는 email 가입 때 사용자가 임의로 넣을 수 있어 쓰지 않는다.
 - 이미 다른 사용자와 연결된 멤버, 이미 연결된 사용자는 바꾸지 않는다. 등록되지 않은 login이면 아무것도 하지 않는다. 트리거는 오류를 내지 않는다(로그인을 막지 않음).
 - 마이그레이션 전에 로그인한 사용자는 마이그레이션이 한 번 연결한다.
+- **멤버를 나중에 추가해도 연결된다**(#109): `members` insert·`github_login` 변경 때 트리거 `link_member_on_member_change`가 같은 조건으로 이미 로그인한 GitHub 사용자를 찾아 `auth_user_id`를 채운다. 그래서 "로그인 → 멤버 추가", "멤버 추가 → 로그인" 어느 순서든 연결된다.
+  - 같은 login의 GitHub 사용자가 둘 이상이면 누구인지 알 수 없어 비워 둔다.
+  - 이미 연결된 멤버의 `github_login`을 바꿔도 연결은 그대로다. 다른 사람으로 바꿔야 하면 `auth_user_id`를 null로 만든 뒤 `github_login`을 다시 저장한다.
 
 ## 조회 뷰 · RPC
 
@@ -370,6 +373,7 @@ erDiagram
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
+| v1.4 | 2026-11-20 | 마이그레이션 `member_link_on_insert`와 맞춤: 멤버 추가·`github_login` 변경 때도 이미 로그인한 GitHub 사용자와 연결(#109) |
 | v1.3 | 2026-11-19 | 마이그레이션 `rls_policies`·`views_rpc`와 맞춤: RLS 정책(팀 범위·퀴즈 본인만, select만), 첫 GitHub 로그인 때 `members.auth_user_id` 연결, 조회 뷰 5개·RPC 5개(#94) |
 | v1.2 | 2026-11-17 | 마이그레이션 `ingest_events`와 맞춤: `ingest_tokens`(팀 토큰 해시) 추가, `ingest-events` 적재 동작(팀 레포 확인, `cli`만, 건별 결과) |
 | v1.1 | 2026-11-13 | 마이그레이션(`schema_v1`, `repo_lowercase`)과 맞춤: 퀴즈 생성·저장 주체를 watcher로 변경, `pr_reviews` 추가(D4, #44), `prs.state` 값·소문자 확정, `repo` 소문자 제약(#55), 적재 규칙 테이블별 분리, `member`·`github_login` 빈 값 금지(#47) |
