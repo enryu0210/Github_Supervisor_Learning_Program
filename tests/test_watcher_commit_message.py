@@ -10,6 +10,7 @@ def _config() -> WatcherConfig:
         repo="owner/repo",
         poll_interval_seconds=300,
         events_dir=Path("./events"),
+        prs_path=Path("./prs.json"),
     )
 
 

@@ -7,9 +7,11 @@ TOKEN_ENV = "GITHUB_TOKEN"
 REPO_ENV = "GITHUB_REPO"
 POLL_INTERVAL_ENV = "WATCHER_POLL_INTERVAL_SECONDS"
 EVENTS_DIR_ENV = "WATCHER_EVENTS_DIR"
+PRS_PATH_ENV = "WATCHER_PRS_PATH"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
 DEFAULT_EVENTS_DIR = "./events"
+DEFAULT_PRS_PATH = "./prs.json"
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -24,6 +26,7 @@ class WatcherConfig:
     repo: str
     poll_interval_seconds: int
     events_dir: Path
+    prs_path: Path
 
 
 def load_config() -> WatcherConfig:
@@ -42,12 +45,14 @@ def load_config() -> WatcherConfig:
 
     poll_interval_seconds = _poll_interval()
     events_dir = Path(os.environ.get(EVENTS_DIR_ENV) or DEFAULT_EVENTS_DIR)
+    prs_path = Path(os.environ.get(PRS_PATH_ENV) or DEFAULT_PRS_PATH)
 
     return WatcherConfig(
         token=token,
         repo=repo,
         poll_interval_seconds=poll_interval_seconds,
         events_dir=events_dir,
+        prs_path=prs_path,
     )
 
 
