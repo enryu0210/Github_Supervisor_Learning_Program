@@ -1,6 +1,6 @@
 # ERD — Supabase DB
 
-> 버전: **v1.2** (2026-11-17, v1 2026-11-08 확정) · 담당: 이남주(DB)
+> 버전: **v1.3** (2026-11-19, v1 2026-11-08 확정) · 담당: 이남주(DB)
 > 기준: 이벤트 JSON 계약은 [`docs/guide/01_cli.md` 6절](../guide/01_cli.md)(이벤트 스키마 v1)을 따른다. 이 문서는 테이블·DB 제약·점검 쿼리·인덱스·RLS·뷰의 기준이다.
 >
 > 테이블은 `supabase/migrations/`의 마이그레이션으로만 만든다(11/14~). 이 문서와 마이그레이션이 다르면 마이그레이션이 실제 상태다.
@@ -311,30 +311,66 @@ erDiagram
 
 ## 보안 (RLS)
 
-- **모든 테이블에 RLS를 켠다.** 정책 없이는 anon/authenticated가 아무것도 읽지 못한다.
-- 판정 기준: `auth.uid()` → `members.auth_user_id` → `team_id` / `member_id`
-  - 같은 팀 데이터만 읽는다.
-  - `quiz_attempts`와 "내 기록"은 본인 것만 읽는다.
-- 웹은 테이블이 아니라 `security_invoker = true` 뷰를 읽는다. 정책·뷰는 별도 마이그레이션(11/19~20)에서 만든다.
+- **모든 테이블에 RLS를 켠다.** 정책이 없는 테이블은 anon/authenticated가 아무것도 읽지 못한다.
+- 판정 기준: `auth.uid()` → `members.auth_user_id` → `team_id` / `member_id` (판정 함수 `private.my_team_id()`·`private.my_member_id()`, API에 노출되지 않는 `private` 스키마)
+- 정책은 **select만, `authenticated`만** 둔다. 웹용 쓰기 정책은 없다(v0.1 웹은 읽기만). 적재는 service role만 한다.
 
-## 조회 뷰 (예정)
-
-| 뷰 | 내용 |
+| 테이블 | 로그인한 멤버가 읽는 범위 |
 |---|---|
-| `v_rule_stats` | 규칙별 집계 (rule_id·action·severity별 건수) |
-| `v_member_activity` | 멤버별 PR·리뷰 활동 |
-| `v_stale_prs` | 방치된 PR (`last_activity_at` 기준) |
-| `v_guide_completion` | 규칙·멤버별 `guided` 대비 `guide_completed`·`guide_stopped` 비율 |
+| `teams`·`members`·`repos` | 내 팀 |
+| `prs`·`pr_reviews` | 내 팀 레포의 PR |
+| `events` | 내 팀 레포(`repo = repos.full_name`)의 이벤트 |
+| `quizzes`·`quiz_attempts` | 본인 것만 |
+| `ingest_tokens` | 없음 |
 
-반환 컬럼은 웹 `lib/data/` 타입(11/16 전후)에 맞춰 정한다.
+- 로그인 전(anon)과 `members`에 연결되지 않은 로그인 사용자(팀 밖 GitHub 계정, email 가입)는 아무것도 읽지 못한다.
 
-- `quizzes`·`quiz_attempts`의 `member_id`는 뷰에서 `members`와 조인해 `github_login`을 `member` 컬럼으로 내보낸다.
-- `v_stale_prs`의 `url`은 저장하지 않고 뷰에서 `'https://github.com/' || repos.full_name || '/pull/' || prs.number`로 만든다.
+### 로그인 ↔ members 연결
+
+- 멤버는 seed로 미리 등록하고, **첫 GitHub 로그인 때** `auth.identities`(provider `github`)의 `identity_data.user_name`을 소문자로 바꿔 `members.github_login`과 매칭해 `auth_user_id`를 채운다(트리거 `on_github_identity_created`).
+- `auth.users.raw_user_meta_data`는 email 가입 때 사용자가 임의로 넣을 수 있어 쓰지 않는다.
+- 이미 다른 사용자와 연결된 멤버, 이미 연결된 사용자는 바꾸지 않는다. 등록되지 않은 login이면 아무것도 하지 않는다. 트리거는 오류를 내지 않는다(로그인을 막지 않음).
+- 마이그레이션 전에 로그인한 사용자는 마이그레이션이 한 번 연결한다.
+
+## 조회 뷰 · RPC
+
+웹(`dashboard/lib/data`)은 테이블을 직접 읽지 않고 아래만 읽는다(#94). 뷰는 `security_invoker = true`, RPC는 `security invoker` → 로그인한 사용자 권한(RLS)으로 실행된다. anon은 실행 권한이 없다. 컬럼 이름·타입은 웹 타입과 같다(건수 `integer`, 비율 `double precision`).
+
+| 웹 함수 | DB | 내용 |
+|---|---|---|
+| `getEvents(filter)` | RPC `get_events` | 이벤트 15개 필드, `occurred_at desc, id desc` |
+| `getRelatedEvents(ids)` | 뷰 `v_events` | `related_event_id`로 조회 (`created_at` 뺀 15개 필드) |
+| `getMembers()` | 뷰 `v_members` (`member`) | 등록 멤버 ∪ 이벤트·PR·리뷰에 나온 login. `unknown`·`*[bot]` 제외, 알파벳순 |
+| `getRuleStats(filter)` | RPC `get_rule_stats` | 규칙별 위반 수·action별 건수·`ratio`. `severity` = 그 규칙 위반 중 최고값 |
+| `getGuideStats(filter)` | RPC `get_guide_stats` | 규칙별 `guided` 대비 완료·중단·진행 중, `completion_rate` |
+| `getDailyTrend(filter)` | RPC `get_daily_trend` | KST 날짜(`date` "YYYY-MM-DD")별 위반 수. 기간이 있으면 빈 날 0 |
+| `getMemberActivity(range)` | RPC `get_member_activity(p_from, p_to)` | 멤버별 `prs_opened`·`prs_merged`·`reviews_given`·`violation_count` |
+| `getStalePrs()` | 뷰 `v_stale_prs` | 열려 있고 마지막 활동 후 3일 이상, `idle_days` 큰 순 |
+| `getQuizzes(member)` | 뷰 `v_quizzes` | `member_id` → `member`, `explanation`은 null 그대로 |
+| `getQuizAttempts(member)` | 뷰 `v_quiz_attempts` | v0.1은 비어 있음 |
+
+필터 RPC 4개(`get_events`·`get_rule_stats`·`get_guide_stats`·`get_daily_trend`)는 웹 `EventFilter`와 같은 이름 있는 인자 9개를 받는다. 모두 기본값 null이고, null·빈 배열·빈 문자열은 "전체"다.
+
+| 인자 | 타입 | 조건 |
+|---|---|---|
+| `p_from`·`p_to` | timestamptz | `occurred_at` — `p_from` 포함, `p_to` 미포함 |
+| `p_members`·`p_rule_ids`·`p_sources`·`p_severities`·`p_actions` | text[] | 목록 중 하나 |
+| `p_repo` | text | 같은 값 |
+| `p_query` | text | `command_summary`·`branch`·`"#PR번호"`에 들어 있는지 (앞뒤 공백 제거, 대소문자 무시) |
+
+집계 기준:
+- **위반 수** = `allowed`·`guided`·`blocked`·`detected`, **복구 가이드(`guided` + `related_event_id` 있음)는 뺀다**(웹 `isViolation()`과 같음). 방치 PR·리뷰 쏠림 rule_id가 정해지면 여기서도 뺀다.
+- **가이드 완료율** 분모 = 필터에 맞는 `guided` 전부(복구 가이드 포함). 결과 이벤트는 필터·기간과 상관없이 찾고, `guide_completed`가 하나라도 있으면 완료.
+- **`reviews_given`** = 기간 안에 리뷰한 PR 수 (`pr_reviews.submitted_at` 기준, 같은 PR 여러 번 = 1, PR 작성자 본인 리뷰 제외).
+- **`prs_merged`** = `merged_at`이 기간 안인 PR 수. 날짜 경계는 KST(`Asia/Seoul`).
+- `v_stale_prs.url`은 저장하지 않고 `'https://github.com/' || repos.full_name || '/pull/' || prs.number`로 만든다. 방치 기준(3일)을 바꾸면 watcher·대시보드도 같이 고친다.
+- Supabase API는 한 번에 최대 1000행까지 돌려준다. `get_events`가 이를 넘으면 웹 집계가 틀어지므로, 넘을 것 같으면 집계를 RPC로 옮긴다.
 
 ## 변경 이력
 
 | 버전 | 날짜 | 내용 |
 |---|---|---|
+| v1.3 | 2026-11-19 | 마이그레이션 `rls_policies`·`views_rpc`와 맞춤: RLS 정책(팀 범위·퀴즈 본인만, select만), 첫 GitHub 로그인 때 `members.auth_user_id` 연결, 조회 뷰 5개·RPC 5개(#94) |
 | v1.2 | 2026-11-17 | 마이그레이션 `ingest_events`와 맞춤: `ingest_tokens`(팀 토큰 해시) 추가, `ingest-events` 적재 동작(팀 레포 확인, `cli`만, 건별 결과) |
 | v1.1 | 2026-11-13 | 마이그레이션(`schema_v1`, `repo_lowercase`)과 맞춤: 퀴즈 생성·저장 주체를 watcher로 변경, `pr_reviews` 추가(D4, #44), `prs.state` 값·소문자 확정, `repo` 소문자 제약(#55), 적재 규칙 테이블별 분리, `member`·`github_login` 빈 값 금지(#47) |
 | v1 | 2026-11-08 | action을 v1 값 6개로 교체(v0 `blocked/ran/warned` 폐기), `related_event_id` 추가, `severity` 값 확정, `members.auth_user_id` 채택, `quizzes.created_at` 추가, 소문자·allowed 제약 확정, 퀴즈 id를 CLI 생성으로 변경, `prs.title` 추가, `quiz_attempts.correct` → `is_correct` (PR #12 리뷰) |
