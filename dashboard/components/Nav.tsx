@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CURRENT_USER } from "@/lib/user";
+import type { ReactNode } from "react";
 
 /** 상단 메뉴. 순서와 이름은 docs/wireframes/README.md 기준 */
 const MENU = [
@@ -14,7 +14,8 @@ const MENU = [
 ] as const;
 
 
-export default function Nav() {
+/** user: 오른쪽 사용자 영역 (서버에서 로그인 정보를 읽어 넘긴다, components/UserMenu.tsx) */
+export default function Nav({ user }: { user: ReactNode }) {
   const pathname = usePathname();
 
   return (
@@ -43,10 +44,7 @@ export default function Nav() {
           );
         })}
       </div>
-      <span className="ml-auto flex items-center gap-2 text-sm text-[#555]">
-        <span className="inline-block h-[26px] w-[26px] rounded-full bg-accent-light" aria-hidden />
-        {CURRENT_USER}
-      </span>
+      <div className="ml-auto flex items-center gap-2 text-sm text-[#555]">{user}</div>
     </nav>
   );
 }

@@ -5,7 +5,7 @@ import QuizRunner, { type QuizItem } from "@/components/QuizRunner";
 import { EmptyState, LoadingState } from "@/components/StateViews";
 import { data } from "@/lib/data";
 import type { SearchParams } from "@/lib/filters";
-import { CURRENT_USER } from "@/lib/user";
+import { requireCurrentUser } from "@/lib/user";
 
 // /quiz 복습 퀴즈 (와이어프레임 04-quiz)
 // - 퀴즈는 웹에서 만들지 않는다. watcher 가 만들어 DB 에 넣은 것을 보여 주기만 한다
@@ -27,12 +27,13 @@ export default function QuizPage({ searchParams }: PageProps<"/quiz">) {
 async function QuizContent({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const sp = await searchParams;
   await connection();
-  const all = await data.getQuizzes(CURRENT_USER);
+  const me = await requireCurrentUser();
+  const all = await data.getQuizzes(me);
   const rule = typeof sp.rule === "string" ? sp.rule : undefined;
   const quizzes = rule ? all.filter((q) => q.rule_id === rule) : all;
 
   // 문제마다 "이 문제가 나온 이유" 이벤트를 붙인다
-  const events = await data.getEvents({ members: [CURRENT_USER] });
+  const events = await data.getEvents({ members: [me] });
   const byId = new Map(events.map((e) => [e.id, e]));
   const items: QuizItem[] = quizzes.map((q) => ({
     quiz: q,

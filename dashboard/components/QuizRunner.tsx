@@ -161,9 +161,12 @@ export default function QuizRunner({ items }: { items: QuizItem[] }) {
               <p className={`font-bold ${isCorrect ? "text-ok" : "text-high"}`}>
                 {isCorrect ? "✅ 정답이에요!" : `❌ 아쉬워요. 정답은 ${quiz.answer_index + 1}번이에요.`}
               </p>
-              <p className="mt-2 text-sm leading-relaxed">
-                <InlineCode text={quiz.explanation} />
-              </p>
+              {/* 해설이 없는 문제(null)는 해설 줄만 숨긴다 (#94 5번) */}
+              {quiz.explanation && (
+                <p className="mt-2 text-sm leading-relaxed">
+                  <InlineCode text={quiz.explanation} />
+                </p>
+              )}
               <button type="button" onClick={next} className="mt-4 rounded-lg bg-accent px-5 py-2 text-sm font-semibold text-white">
                 {index + 1 < items.length ? "다음 문제 →" : "결과 보기 →"}
               </button>

@@ -31,6 +31,21 @@ v0.1은 레포 맨 위 `samples/*.json`(스키마 v1 더미)을 `lib/data/mock/s
 npm run samples:sync   # samples/ 가 바뀌면 다시 실행하고 결과 파일을 커밋
 ```
 
+### 실제 DB 연결 (Supabase + GitHub 로그인)
+
+`NEXT_PUBLIC_DATA_SOURCE=supabase` 이면 합성 데이터 대신 남주님의 조회 뷰·RPC(#105)를 읽고, 모든 화면이 GitHub 로그인 뒤에 있어요.
+
+1. `.env.example` 을 `.env.local` 로 복사하고 Supabase 프로젝트(`git-coach-dev`)에서 값을 직접 복사해 넣어요.
+   - `NEXT_PUBLIC_SUPABASE_URL`: Project Settings → Data API → Project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Project Settings → API Keys → `anon`(publishable) 키
+   - **`service_role`(secret) 키는 절대 넣지 않아요.** `.env.local` 은 git 에 올라가지 않아요.
+2. `npm run dev` → http://localhost:3000 → **GitHub로 로그인**
+3. 첫 로그인 때 GitHub 계정이 `members` 에 자동으로 연결돼요. 팀 멤버로 등록되지 않은 계정은 데이터가 0건이에요.
+
+- 로그인 후 돌아오는 주소(`/auth/callback`)는 Supabase Auth 의 Redirect URLs 에 등록돼 있어야 해요. 지금은 `http://localhost:3000/**` 만 있고, Vercel 주소는 배포 때 추가해요.
+- 세션 갱신과 "로그인 안 했으면 /login 으로" 는 `proxy.ts` 가 맡아요.
+- 현재 사용자 = 로그인한 GitHub 계정(소문자). 합성 데이터 모드에서는 `NEXT_PUBLIC_CURRENT_USER`(기본 `jiyoon-lim`).
+
 ### 합성 데이터 (실데이터 연동 전까지)
 
 화면을 채우기 위해 3주치 합성 데이터(`lib/data/mock/synthetic.json`)를 함께 씁니다.
@@ -42,7 +57,7 @@ npm run synthetic:gen  # scripts/gen-synthetic.mjs 를 고친 뒤 다시 생성 
 
 - 날짜는 화면을 여는 날이 속한 주가 "이번 주"가 되도록 주 단위로 옮겨 보여 주고, 아직 오지 않은 시각의 기록은 숨깁니다.
 - `samples/` 20건은 계약 확인용이라 날짜를 옮기지 않습니다.
-- 11/19~20 `NEXT_PUBLIC_DATA_SOURCE=supabase` 로 바꾸면 합성 데이터는 쓰지 않습니다.
+- `NEXT_PUBLIC_DATA_SOURCE=supabase` 로 바꾸면 합성 데이터는 쓰지 않습니다.
 
 ## 폴더
 

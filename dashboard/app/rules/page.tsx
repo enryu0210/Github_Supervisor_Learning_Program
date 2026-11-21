@@ -10,7 +10,7 @@ import type { SearchParams } from "@/lib/filters";
 import { severityLabel } from "@/lib/labels";
 import { DEFERRED_RULES, RULE_DOCS, ruleDoc, type RuleDoc } from "@/lib/rules";
 import { thisWeekRange } from "@/lib/time";
-import { CURRENT_USER } from "@/lib/user";
+import { requireCurrentUser } from "@/lib/user";
 
 // /rules 규칙 도감 (와이어프레임 05-rules)
 // 왼쪽 목록 + 오른쪽 상세. 선택한 규칙은 ?rule=R01 로 URL 에 둔다 (/me 의 "규칙 도감 보기"가 이 주소로 온다)
@@ -160,7 +160,7 @@ async function TeamAndQuiz({ ruleId }: { ruleId: string }) {
   const [stats, guides, quizzes] = await Promise.all([
     data.getRuleStats(week),
     data.getGuideStats(week),
-    data.getQuizzes(CURRENT_USER),
+    data.getQuizzes(await requireCurrentUser()),
   ]);
   const count = stats[0]?.violation_count ?? 0;
   const g = guides[0];

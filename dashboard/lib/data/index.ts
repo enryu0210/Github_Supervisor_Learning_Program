@@ -126,7 +126,8 @@ export type Quiz = {
   question: string;
   choices: string[];
   answer_index: number;
-  explanation: string;
+  /** watcher 가 해설을 못 만들면 null (#94 5번). 화면은 해설 줄만 숨긴다 */
+  explanation: string | null;
   created_at: string;
 };
 
@@ -183,12 +184,12 @@ export interface DataSource {
 /* 구현체 선택 — 화면은 `import { data } from "@/lib/data"` 만 쓴다       */
 /* ------------------------------------------------------------------ */
 
+import { USE_SUPABASE } from "@/lib/supabase/config";
 import { mockSource } from "./mock";
+import { supabaseSource } from "./supabase";
 
-/*
- * 11/19~20 supabaseSource 를 추가하면 아래처럼 바꾼다.
- *   export const data: DataSource =
- *     process.env.NEXT_PUBLIC_DATA_SOURCE === "supabase" ? supabaseSource : mockSource;
+/**
+ * NEXT_PUBLIC_DATA_SOURCE=supabase → 실제 DB(로그인 필수), 그 밖 → 합성 데이터.
  * supabaseSource는 anon 키와 로그인 사용자 토큰만 쓴다. service_role 키는 절대 넣지 않는다.
  */
-export const data: DataSource = mockSource;
+export const data: DataSource = USE_SUPABASE ? supabaseSource : mockSource;
