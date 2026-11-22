@@ -57,6 +57,18 @@ def test_make_detected_event_fixed_fields() -> None:
     assert event.related_event_id is None
 
 
+def test_make_detected_event_uses_provided_occurred_at() -> None:
+    event = _make(occurred_at="2026-11-01T09:00:00+09:00")
+    assert event.occurred_at == "2026-11-01T09:00:00+09:00"
+
+
+def test_make_detected_event_defaults_occurred_at_to_now() -> None:
+    event = _make()
+    assert event.occurred_at is not None
+    # 감지 시각 기본값이 살아있는지만 확인 — 정확한 현재 시각 비교는 불안정하다.
+    assert "T" in event.occurred_at
+
+
 def test_write_event_creates_file_with_matching_content(tmp_path) -> None:
     event = _make()
     output_dir = tmp_path / "events"
