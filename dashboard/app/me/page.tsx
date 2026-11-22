@@ -8,18 +8,17 @@ import { LoadingState } from "@/components/StateViews";
 import { data } from "@/lib/data";
 import { RULE_NAMES, actionLabel } from "@/lib/labels";
 import { thisWeekRange } from "@/lib/time";
-import { CURRENT_USER } from "@/lib/user";
+import { requireCurrentUser } from "@/lib/user";
 import { isViolation, type EventAction, type GitCoachEvent } from "@/types/event";
 
 // /me 내 기록 (와이어프레임 03-me)
-// - 로그인 전이라 현재 사용자는 lib/user.ts 의 CURRENT_USER 로 고정한다
+// - 현재 사용자 = 로그인한 GitHub 계정 (합성 데이터 모드에서는 설정값, lib/user.ts)
 // - 퀴즈 정답률 카드는 넣지 않는다: v0.1은 풀이 기록을 저장하지 않는다 (D5)
 // - 자주 틀린 규칙·선택 습관은 전체 기간, 머리말의 칭찬 문장은 이번 주 기준
 
 export default function MePage() {
   return (
     <section>
-      <h1 className="text-[22px] font-bold">{CURRENT_USER} 님의 Git 학습 기록</h1>
       <Suspense fallback={<div className="mt-4"><LoadingState /></div>}>
         <MeContent />
       </Suspense>
@@ -37,7 +36,7 @@ const BREAKDOWN: { action: EventAction; key: "allowed_count" | "guided_count" | 
 
 async function MeContent() {
   await connection(); // "이번 주"·"오늘"은 요청 시각 기준
-  const me = CURRENT_USER;
+  const me = await requireCurrentUser();
   const mine = { members: [me] };
   const week = thisWeekRange();
 
@@ -69,6 +68,7 @@ async function MeContent() {
 
   return (
     <>
+      <h1 className="text-[22px] font-bold">{me} 님의 Git 학습 기록</h1>
       <p className="mt-1.5 mb-5 text-muted">{cheer}</p>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
