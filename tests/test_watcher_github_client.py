@@ -8,9 +8,15 @@ from watcher.config import WatcherConfig
 
 
 class _FakeResponse:
-    def __init__(self, payload: dict, status_code: int = 200) -> None:
+    def __init__(
+        self,
+        payload: dict,
+        status_code: int = 200,
+        links: dict | None = None,
+    ) -> None:
         self._payload = payload
         self.status_code = status_code
+        self.links = links or {}
 
     def raise_for_status(self) -> None:
         if self.status_code >= 400:
@@ -143,7 +149,9 @@ def test_list_open_pulls_calls_pulls_endpoint_with_state_open(monkeypatch) -> No
     monkeypatch.setattr(github_client._client, "get", fake_get)
     result = github_client.list_open_pulls(_config())
 
-    assert calls == ["https://api.github.com/repos/owner/repo/pulls?state=open"]
+    assert calls == [
+        "https://api.github.com/repos/owner/repo/pulls?state=open&per_page=100"
+    ]
     assert result == [{"number": 1}]
 
 
@@ -160,6 +168,42 @@ def test_list_all_pulls_calls_pulls_endpoint_with_state_all(monkeypatch) -> None
     assert calls == [
         "https://api.github.com/repos/owner/repo/pulls?state=all&per_page=100"
     ]
+    assert result == [{"number": 1}]
+
+
+def test_list_all_pulls_follows_link_header_pagination(monkeypatch) -> None:
+    calls = []
+    next_url = (
+        "https://api.github.com/repos/owner/repo/pulls?state=all&per_page=100&page=2"
+    )
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        if url == next_url:
+            return _FakeResponse([{"number": 101}])
+        return _FakeResponse([{"number": 1}], links={"next": {"url": next_url}})
+
+    monkeypatch.setattr(github_client._client, "get", fake_get)
+    result = github_client.list_all_pulls(_config())
+
+    assert calls == [
+        "https://api.github.com/repos/owner/repo/pulls?state=all&per_page=100",
+        next_url,
+    ]
+    assert result == [{"number": 1}, {"number": 101}]
+
+
+def test_list_all_pulls_stops_when_no_next_link(monkeypatch) -> None:
+    calls = []
+
+    def fake_get(url, *, headers, timeout):
+        calls.append(url)
+        return _FakeResponse([{"number": 1}], links={})
+
+    monkeypatch.setattr(github_client._client, "get", fake_get)
+    result = github_client.list_all_pulls(_config())
+
+    assert len(calls) == 1
     assert result == [{"number": 1}]
 
 
