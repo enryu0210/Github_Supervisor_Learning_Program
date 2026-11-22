@@ -1,0 +1,35 @@
+name: ci-db
+
+on:
+  pull_request:
+    branches: [develop, main]
+    # paths 필터는 일부러 쓰지 않는다. 필수 검사(required check)로 걸었을 때 경로가 안 맞아
+    # 건너뛰면 GitHub 이 "검사 대기 중"으로 영원히 머지를 막는다.
+
+permissions:
+  contents: read
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v3
+        with:
+          # 3.x 는 2026-11-02 에 나온 새 메이저라, 검증된 2.x 마지막 안정판으로 고정한다
+          version: 2.122.0
+      # 빈 Supabase DB(auth 스키마 포함)를 띄우고 supabase/migrations 전부와 seed.sql 을 적용한다.
+      # SQL 오류·순서 오류가 있으면 여기서 실패한다(#115 처럼 실제 DB 에서 아무도 못 돌려 본 경우를 잡기 위함).
+      - name: 마이그레이션·seed 적용
+        run: supabase db start
+      - name: 적용된 마이그레이션 수 확인
+        run: |
+          expected=$(ls supabase/migrations/*.sql | wc -l)
+          applied=$(psql "$DB_URL" -tAc "select count(*) from supabase_migrations.schema_migrations")
+          echo "마이그레이션 파일 ${expected}개, 적용 ${applied}개"
+          test "$expected" -eq "$applied"
+      - name: 정리
+        if: always()
+        run: supabase stop --no-backup

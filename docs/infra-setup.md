@@ -12,20 +12,36 @@ PM 일정의 10/30~11/3 항목 중 코드로 할 수 있는 작업을 `feature/i
 | `ci-lint`, `secret-scan`, `ci-docker-build` | 작성 완료, **GitHub Actions 실행은 미확인** |
 | 착수 전 결정 6가지 | 레포 문서에 미반영, 팀 합의 필요 |
 | 브랜치 보호, 이슈 라벨 | 미설정 |
-| `ci-lint` 웹 부분, `ci-test` | 웹 코드와 CLI 테스트가 올라오면 추가 |
+| `ci-lint` 웹 부분, `ci-test`, `pr-convention`, `ci-db` | 2026-11-22 추가 (아래 "CI 워크플로" 절) |
 
 ## 추가된 파일
 
 | 파일 | 역할 |
 |---|---|
 | `.github/pull_request_template.md` | PR에 무엇을, 왜, 어떻게 테스트했는지 적는 양식 |
-| `.github/workflows/ci-lint.yml` | PR에서 `ruff`로 Python 코드 검사 |
+| `.github/workflows/ci-lint.yml` | PR에서 `ruff`로 Python 코드 검사, ESLint·타입 검사(2026-11-22~) |
 | `.github/workflows/secret-scan.yml` | PR에서 `gitleaks`로 전체 Git 이력의 시크릿 검사 |
 | `.github/workflows/ci-docker-build.yml` | PR에서 Compose 파일 검증과 이미지 빌드 |
 | `docker-compose.yml` | `ollama`, `watcher`, `dashboard` 서비스와 `ollama-models` 볼륨 정의 |
 | `watcher/Dockerfile`, `dashboard/Dockerfile` | 임시 빈 컨테이너. 실제 코드가 생기면 교체 |
 | `.env.example` | 필요한 환경변수 목록. 실제 키 값은 적지 않음 |
 | `.gitignore` | `.env`와 Python, Node 생성 파일 제외 |
+
+## CI 워크플로 (2026-11-22 기준 6개)
+
+모두 `develop`·`main`으로 여는 PR에서 돈다. 머지를 막으려면 develop·main 브랜치 보호의 "Required status checks"에 잡 이름을 등록해야 한다(등록 여부는 `gh api repos/{owner}/{repo}/branches/develop/protection`으로 확인).
+
+| 워크플로 | 잡 | 하는 일 |
+|---|---|---|
+| `ci-lint` | `python`, `web` | `ruff check .`, `ruff format --check src tests` / 대시보드 `npm run lint`, `npm run typecheck` |
+| `ci-test` | `python`, `web-build` | `pip install -e ".[dev]"` 후 `pytest` / 대시보드 `npm run build`(합성 데이터 모드, 키 불필요) |
+| `ci-docker-build` | `compose` | Compose 파일 검증과 이미지 빌드 |
+| `secret-scan` | `gitleaks` | 전체 Git 이력의 시크릿 검사 |
+| `pr-convention` | `check` | 브랜치 이름(R05), base(R08), PR 제목·커밋 메시지(R06). 판정은 CLI·watcher 규칙 함수를 그대로 쓴다(`src/watcher/pr_convention.py`). `release/*` PR은 커밋 검사를 건너뛴다(규칙 이전 커밋이 이력에 있음) |
+| `ci-db` | `migrations` | Supabase CLI로 빈 DB를 띄워 `supabase/migrations` 전부와 `seed.sql`을 적용하고, 적용된 마이그레이션 수가 파일 수와 같은지 확인 |
+
+- `pr-convention` 실패를 로컬에서 재현: `git log --no-merges --format=%s develop..HEAD | HEAD_REF=<브랜치> BASE_REF=develop PR_TITLE="<제목>" python -m watcher.pr_convention`
+- release PR 제목도 R06 형식이어야 한다(예: `chore(infra): v0.1 릴리스`).
 
 ## 실행 방법
 

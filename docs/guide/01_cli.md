@@ -159,7 +159,7 @@ $ git switch -c feature/cli-login-fix
 git-coach/
 ├─ pyproject.toml          # Python 3.11+, Typer·Rich·httpx, dev: pytest·ruff
 ├─ .gitcoach.toml          # 레포별 설정 예시 (protected = ["main"])
-├─ .github/workflows/      # ci-lint.yml, ci-test.yml
+├─ .github/workflows/      # ci-lint, ci-test, ci-docker-build, secret-scan, pr-convention, ci-db (docs/infra-setup.md)
 ├─ src/gitcoach/
 │  ├─ cli.py               # Typer: run, init, doctor, config, log, explain, guide, sync, uninstall
 │  ├─ shim.py              # 전체 흐름 조립 (터미널 확인 → 가이드 확인 → 판정 → 선택 → 실행 → 기록)

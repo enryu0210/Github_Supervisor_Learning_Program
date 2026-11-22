@@ -7,7 +7,6 @@ on:
 permissions:
   contents: read
 
-# 웹(ESLint·Prettier) 잡은 dashboard 코드와 린트 명령이 올라올 때 추가한다.
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -18,3 +17,23 @@ jobs:
           python-version: "3.11"
       - run: pip install ruff
       - run: ruff check .
+      # 포맷 검사는 코드(src·tests)만 한다. 문서(.md) 안의 예시 코드 블록까지 강제하면
+      # 설명용으로 줄을 일부러 나눈 예시가 매번 실패한다(docs/db/watcher-load.md 등).
+      - run: ruff format --check src tests
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      # typecheck = next typegen && tsc — 화면 경로 타입(PageProps)을 먼저 만들어야 통과한다(#117)
+      - run: npm run typecheck

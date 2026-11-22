@@ -1,0 +1,37 @@
+name: ci-test
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      # 패키지로 설치해야 tests 가 gitcoach·watcher 를 import 할 수 있다(src 레이아웃)
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  web-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: npm ci
+      # NEXT_PUBLIC_DATA_SOURCE 를 비워 두면 합성 데이터 모드라 Supabase 키 없이 빌드된다.
+      # 키를 CI 에 넣지 않으려는 의도 — fork PR 에는 시크릿이 전달되지도 않는다.
+      - run: npm run build

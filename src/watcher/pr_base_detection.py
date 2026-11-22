@@ -8,11 +8,16 @@ from watcher.config import WatcherConfig
 _REQUIRED_BASE = "develop"
 
 
+def is_valid_pr_base(head_ref: str, base_ref: str) -> bool:
+    """R08 판정만 따로 뺀 것 — CI pr-convention(watcher/pr_convention.py)도 같은 기준을 쓴다."""
+    return head_ref.startswith("release/") or base_ref == _REQUIRED_BASE
+
+
 def check_pr_base(repo: str, pr: dict) -> Event | None:
     head_ref = pr["head"]["ref"]
     base_ref = pr["base"]["ref"]
 
-    if head_ref.startswith("release/") or base_ref == _REQUIRED_BASE:
+    if is_valid_pr_base(head_ref, base_ref):
         return None
 
     number = pr["number"]
