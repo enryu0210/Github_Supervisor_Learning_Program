@@ -9,6 +9,7 @@ from watcher import (
     events,
     github_client,
     pr_base_detection,
+    pr_reviews,
     push_detection,
     review_concentration,
     stale_prs,
@@ -23,8 +24,9 @@ def poll_once(config: WatcherConfig) -> None:
     """한 번의 폴링 tick. 토큰·레포 설정이 실제로 GitHub API와 통하는지 확인하는
     스모크 호출 후, push 감지(R01·R02)·브랜치명 감지(R05)·PR base 감지(R08)·
     커밋 메시지 감지(R06)를 돌려 위반이 있으면 이벤트로 저장하고,
-    PR 스냅샷(`prs.last_activity_at`, 방치 PR 판정용)과 리뷰 쏠림 통계
-    (멤버별 리뷰 수·비중, 판정 기준값은 D2 미정이라 숫자만)를 매번 덮어쓴다."""
+    PR 스냅샷(`prs.last_activity_at`, 방치 PR 판정용)·리뷰 쏠림 통계
+    (멤버별 리뷰 수·비중, 판정 기준값은 D2 미정이라 숫자만)·`pr_reviews` 원본
+    (review 단위, D4/#44 확정 필드)을 매번 덮어쓴다."""
     repo = github_client.get_repo(config)
     logger.info(
         "poll ok: %s (default_branch=%s)", config.repo, repo.get("default_branch")
@@ -55,6 +57,10 @@ def poll_once(config: WatcherConfig) -> None:
         reviews, config.review_concentration_path
     )
     logger.info("review concentration snapshot: %d명 -> %s", len(reviews), path)
+
+    pr_review_records = pr_reviews.run(config)
+    path = pr_reviews.write_snapshot(pr_review_records, config.pr_reviews_path)
+    logger.info("pr reviews snapshot: %d건 -> %s", len(pr_review_records), path)
 
 
 def run_forever(

@@ -13,6 +13,7 @@ def _config(
     events_dir: Path | None = None,
     prs_path: Path | None = None,
     review_concentration_path: Path | None = None,
+    pr_reviews_path: Path | None = None,
 ) -> WatcherConfig:
     return WatcherConfig(
         token="secret-token",
@@ -22,6 +23,7 @@ def _config(
         prs_path=prs_path or Path("./prs.json"),
         review_concentration_path=review_concentration_path
         or Path("./review_concentration.json"),
+        pr_reviews_path=pr_reviews_path or Path("./pr_reviews.json"),
     )
 
 
@@ -56,6 +58,8 @@ def test_poll_once_logs_default_branch(monkeypatch, caplog) -> None:
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config())
     assert "owner/repo" in caplog.text
@@ -76,6 +80,8 @@ def test_poll_once_writes_detected_events(monkeypatch, caplog, tmp_path) -> None
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -99,6 +105,8 @@ def test_poll_once_writes_no_file_when_no_violations(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     poller.poll_once(_config(events_dir=tmp_path))
 
@@ -125,6 +133,8 @@ def test_poll_once_writes_events_from_both_detectors(
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -152,6 +162,8 @@ def test_poll_once_writes_branch_naming_events_only(
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -177,6 +189,8 @@ def test_poll_once_writes_pr_base_events_only(monkeypatch, caplog, tmp_path) -> 
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -204,6 +218,8 @@ def test_poll_once_writes_commit_message_events_only(
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     with caplog.at_level(logging.INFO, logger="watcher"):
         poller.poll_once(_config(events_dir=tmp_path))
@@ -235,6 +251,8 @@ def test_poll_once_writes_events_from_all_detectors(monkeypatch, tmp_path) -> No
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     poller.poll_once(_config(events_dir=tmp_path))
 
@@ -255,6 +273,8 @@ def test_poll_once_writes_prs_snapshot(monkeypatch, caplog, tmp_path) -> None:
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     prs_path = tmp_path / "prs.json"
     with caplog.at_level(logging.INFO, logger="watcher"):
@@ -277,6 +297,8 @@ def test_poll_once_overwrites_prs_snapshot_when_empty(monkeypatch, tmp_path) -> 
     monkeypatch.setattr(
         poller.review_concentration, "write_snapshot", lambda records, path: path
     )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     prs_path = tmp_path / "prs.json"
     prs_path.write_text(json.dumps([{"number": 1}]), encoding="utf-8")
@@ -300,6 +322,8 @@ def test_poll_once_writes_review_concentration_snapshot(
     monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
     summary = [{"reviewer": "hoil-lim", "review_count": 3, "share": 1.0}]
     monkeypatch.setattr(poller.review_concentration, "run", lambda cfg: summary)
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     review_path = tmp_path / "review_concentration.json"
     with caplog.at_level(logging.INFO, logger="watcher"):
@@ -327,6 +351,8 @@ def test_poll_once_overwrites_review_concentration_snapshot_when_empty(
     monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
     monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
     monkeypatch.setattr(poller.review_concentration, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_reviews, "write_snapshot", lambda records, path: path)
 
     review_path = tmp_path / "review_concentration.json"
     review_path.write_text(json.dumps([{"reviewer": "old"}]), encoding="utf-8")
@@ -336,6 +362,70 @@ def test_poll_once_overwrites_review_concentration_snapshot_when_empty(
     )
 
     assert json.loads(review_path.read_text(encoding="utf-8")) == []
+
+
+def test_poll_once_writes_pr_reviews_snapshot(monkeypatch, caplog, tmp_path) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
+    monkeypatch.setattr(poller.review_concentration, "run", lambda cfg: [])
+    monkeypatch.setattr(
+        poller.review_concentration, "write_snapshot", lambda records, path: path
+    )
+    review_record = {
+        "review_id": 1,
+        "repo": "owner/repo",
+        "pr_number": 1,
+        "reviewer": "hoil-lim",
+        "status": "APPROVED",
+        "submitted_at": "2026-11-16T00:00:00+09:00",
+        "commit_sha": "abc111",
+        "html_url": "https://github.com/owner/repo/pull/1#pullrequestreview-1",
+    }
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [review_record])
+
+    pr_reviews_path = tmp_path / "pr_reviews.json"
+    with caplog.at_level(logging.INFO, logger="watcher"):
+        poller.poll_once(
+            _config(events_dir=tmp_path / "events", pr_reviews_path=pr_reviews_path)
+        )
+
+    assert json.loads(pr_reviews_path.read_text(encoding="utf-8")) == [review_record]
+    assert "1건" in caplog.text
+
+
+def test_poll_once_overwrites_pr_reviews_snapshot_when_empty(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(
+        poller.github_client, "get_repo", lambda cfg: {"default_branch": "main"}
+    )
+    monkeypatch.setattr(poller.push_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.branch_naming, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
+    monkeypatch.setattr(poller.stale_prs, "write_snapshot", lambda records, path: path)
+    monkeypatch.setattr(poller.review_concentration, "run", lambda cfg: [])
+    monkeypatch.setattr(
+        poller.review_concentration, "write_snapshot", lambda records, path: path
+    )
+    monkeypatch.setattr(poller.pr_reviews, "run", lambda cfg: [])
+
+    pr_reviews_path = tmp_path / "pr_reviews.json"
+    pr_reviews_path.write_text(json.dumps([{"review_id": 1}]), encoding="utf-8")
+
+    poller.poll_once(
+        _config(events_dir=tmp_path / "events", pr_reviews_path=pr_reviews_path)
+    )
+
+    assert json.loads(pr_reviews_path.read_text(encoding="utf-8")) == []
 
 
 def test_run_forever_sleeps_between_ticks(monkeypatch) -> None:
