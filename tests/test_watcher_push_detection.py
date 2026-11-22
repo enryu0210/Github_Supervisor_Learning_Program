@@ -23,11 +23,13 @@ def _push_event(
     before: str = "a" * 40,
     head: str = "b" * 40,
     actor_login: str = "hoil-lim",
+    created_at: str = "2026-11-16T03:00:00Z",
 ) -> dict:
     return {
         "type": "PushEvent",
         "actor": {"login": actor_login},
         "payload": {"ref": ref, "before": before, "head": head},
+        "created_at": created_at,
     }
 
 
@@ -54,6 +56,7 @@ def test_check_push_event_detects_r01_when_no_merged_pr(monkeypatch) -> None:
     assert violations[0].severity == "high"
     assert violations[0].branch == "main"
     assert violations[0].member == "hoil-lim"
+    assert violations[0].occurred_at == "2026-11-16T03:00:00Z"
 
 
 def test_check_push_event_skips_r01_when_pr_merge(monkeypatch) -> None:
@@ -137,6 +140,7 @@ def test_check_push_event_detects_r02_when_diverged(monkeypatch) -> None:
     assert len(violations) == 1
     assert violations[0].rule_id == "R02"
     assert violations[0].severity == "high"
+    assert violations[0].occurred_at == "2026-11-16T03:00:00Z"
 
 
 def test_check_push_event_skips_r02_when_ahead(monkeypatch) -> None:
@@ -195,6 +199,7 @@ def test_check_push_event_detects_both_r01_and_r02(monkeypatch) -> None:
     violations = push_detection.check_push_event(_config(), _push_event())
 
     assert {v.rule_id for v in violations} == {"R01", "R02"}
+    assert all(v.occurred_at == "2026-11-16T03:00:00Z" for v in violations)
 
 
 def test_is_pr_merge_fails_open_on_api_error(monkeypatch) -> None:

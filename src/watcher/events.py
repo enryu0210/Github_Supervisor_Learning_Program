@@ -21,6 +21,7 @@ def make_detected_event(
     entity: str,
     explanation: str,
     pr_number: int | None = None,
+    occurred_at: str | None = None,
 ) -> Event:
     repo = repo.lower()
     member = member.lower()
@@ -28,7 +29,11 @@ def make_detected_event(
     return Event(
         id=str(event_id),
         schema_version=1,
-        occurred_at=datetime.now().astimezone().isoformat(timespec="seconds"),
+        # events는 DB에 do-nothing upsert되므로 occurred_at은 최초 적재 값이 영구
+        # 고정된다. 실제 사건 시각을 아는 호출자(push_detection 등)는 occurred_at을
+        # 넘기고, 모르는 경우(R05)만 감지 시각으로 대신한다(watcher-load.md 3절).
+        occurred_at=occurred_at
+        or datetime.now().astimezone().isoformat(timespec="seconds"),
         source="github",
         repo=repo,
         member=member,

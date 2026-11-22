@@ -28,6 +28,7 @@ def check_pr_base(repo: str, pr: dict) -> Event | None:
             f"열려 있음({_REQUIRED_BASE}이어야 함)"
         ),
         pr_number=number,
+        occurred_at=pr["created_at"],
     )
 
 

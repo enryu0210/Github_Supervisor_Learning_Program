@@ -59,6 +59,7 @@ def check_push_event(config: WatcherConfig, raw_event: dict) -> list[Event]:
     before = payload["before"]
     head = payload["head"]
     member = raw_event["actor"]["login"]
+    occurred_at = raw_event["created_at"]
 
     violations: list[Event] = []
 
@@ -75,6 +76,7 @@ def check_push_event(config: WatcherConfig, raw_event: dict) -> list[Event]:
                     f"GitHub Events API 조회 결과 {branch} 브랜치에 직접 push 발견"
                     "(연결된 병합 PR 없음)"
                 ),
+                occurred_at=occurred_at,
             )
         )
 
@@ -91,6 +93,7 @@ def check_push_event(config: WatcherConfig, raw_event: dict) -> list[Event]:
                     "GitHub compare API 결과 히스토리가 재작성된 force push 발견"
                     "(status=diverged)"
                 ),
+                occurred_at=occurred_at,
             )
         )
 

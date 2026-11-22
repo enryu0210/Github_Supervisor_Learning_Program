@@ -16,12 +16,20 @@ def _config() -> WatcherConfig:
     )
 
 
-def _pr(*, number: int = 1, head: str, base: str, author: str = "hoil-lim") -> dict:
+def _pr(
+    *,
+    number: int = 1,
+    head: str,
+    base: str,
+    author: str = "hoil-lim",
+    created_at: str = "2026-11-16T03:00:00Z",
+) -> dict:
     return {
         "number": number,
         "head": {"ref": head},
         "base": {"ref": base},
         "user": {"login": author},
+        "created_at": created_at,
     }
 
 
@@ -37,6 +45,7 @@ def test_check_pr_base_flags_feature_branch_targeting_main() -> None:
     assert event.pr_number == 1
     assert event.member == "hoil-lim"
     assert "develop" in event.explanation
+    assert event.occurred_at == "2026-11-16T03:00:00Z"
 
 
 def test_check_pr_base_flags_fix_branch_targeting_main() -> None:

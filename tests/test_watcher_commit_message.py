@@ -26,10 +26,14 @@ def _commit(
     message: str,
     author: str | None = "hoil-lim",
     parents: list[dict] | None = None,
+    committer_date: str = "2026-11-16T03:00:00Z",
 ) -> dict:
     return {
         "sha": sha,
-        "commit": {"message": message},
+        "commit": {
+            "message": message,
+            "committer": {"date": committer_date},
+        },
         "author": {"login": author} if author is not None else None,
         "parents": parents if parents is not None else [{"sha": "p" * 40}],
     }
@@ -49,6 +53,7 @@ def test_check_commit_flags_invalid_message() -> None:
     assert event.pr_number == 42
     assert event.member == "hoil-lim"
     assert "42" in event.explanation
+    assert event.occurred_at == "2026-11-16T03:00:00Z"
 
 
 def test_check_commit_uses_sha_as_entity_via_idempotent_id() -> None:
@@ -123,7 +128,13 @@ def test_check_commit_member_fallback_when_author_is_null() -> None:
 
 def test_check_commit_member_fallback_when_author_missing() -> None:
     pr = _pr()
-    commit = {"sha": "c" * 40, "commit": {"message": "fix login"}}
+    commit = {
+        "sha": "c" * 40,
+        "commit": {
+            "message": "fix login",
+            "committer": {"date": "2026-11-16T03:00:00Z"},
+        },
+    }
 
     event = commit_message.check_commit("owner/repo", pr, commit)
 

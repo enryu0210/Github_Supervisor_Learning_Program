@@ -32,6 +32,7 @@ def check_commit(repo: str, pr: dict, commit: dict) -> Event | None:
         entity=commit["sha"],
         explanation=f"GitHub PR #{number}의 커밋 목록 조회 결과 커밋 메시지 규칙 위반 발견",
         pr_number=number,
+        occurred_at=commit["commit"]["committer"]["date"],
     )
 
 

@@ -44,6 +44,9 @@ def check_branch(config: WatcherConfig, branch: dict) -> Event | None:
     member = _attribute_member(config, sha) if sha else _UNKNOWN_MEMBER
     suggestion = suggest_name(name)
 
+    # 브랜치 생성 시각을 얻을 신뢰할 만한 API가 없어(branches 목록엔 없고, head
+    # 커밋 시각은 그 이후 커밋으로 갱신될 수 있음) occurred_at은 감지 시각으로
+    # 둔다(watcher-load.md 3절 예외).
     return events.make_detected_event(
         rule_id="R05",
         severity="low",
