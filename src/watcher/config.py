@@ -6,16 +6,12 @@ from pathlib import Path
 TOKEN_ENV = "GITHUB_TOKEN"
 REPO_ENV = "GITHUB_REPO"
 POLL_INTERVAL_ENV = "WATCHER_POLL_INTERVAL_SECONDS"
-EVENTS_DIR_ENV = "WATCHER_EVENTS_DIR"
-PRS_PATH_ENV = "WATCHER_PRS_PATH"
 REVIEW_CONCENTRATION_PATH_ENV = "WATCHER_REVIEW_CONCENTRATION_PATH"
-PR_REVIEWS_PATH_ENV = "WATCHER_PR_REVIEWS_PATH"
+SUPABASE_URL_ENV = "SUPABASE_URL"
+SUPABASE_SERVICE_KEY_ENV = "SUPABASE_SERVICE_ROLE_KEY"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
-DEFAULT_EVENTS_DIR = "./events"
-DEFAULT_PRS_PATH = "./prs.json"
 DEFAULT_REVIEW_CONCENTRATION_PATH = "./review_concentration.json"
-DEFAULT_PR_REVIEWS_PATH = "./pr_reviews.json"
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -29,10 +25,9 @@ class WatcherConfig:
     token: str
     repo: str
     poll_interval_seconds: int
-    events_dir: Path
-    prs_path: Path
     review_concentration_path: Path
-    pr_reviews_path: Path
+    supabase_url: str
+    supabase_service_key: str
 
 
 def load_config() -> WatcherConfig:
@@ -49,25 +44,27 @@ def load_config() -> WatcherConfig:
             f"환경변수 {REPO_ENV}는 owner/name 형식이어야 해요: {repo!r}"
         )
 
+    supabase_url = os.environ.get(SUPABASE_URL_ENV)
+    if not supabase_url:
+        raise WatcherConfigError(f"환경변수 {SUPABASE_URL_ENV}이 필요해요.")
+
+    supabase_service_key = os.environ.get(SUPABASE_SERVICE_KEY_ENV)
+    if not supabase_service_key:
+        raise WatcherConfigError(f"환경변수 {SUPABASE_SERVICE_KEY_ENV}이 필요해요.")
+
     poll_interval_seconds = _poll_interval()
-    events_dir = Path(os.environ.get(EVENTS_DIR_ENV) or DEFAULT_EVENTS_DIR)
-    prs_path = Path(os.environ.get(PRS_PATH_ENV) or DEFAULT_PRS_PATH)
     review_concentration_path = Path(
         os.environ.get(REVIEW_CONCENTRATION_PATH_ENV)
         or DEFAULT_REVIEW_CONCENTRATION_PATH
-    )
-    pr_reviews_path = Path(
-        os.environ.get(PR_REVIEWS_PATH_ENV) or DEFAULT_PR_REVIEWS_PATH
     )
 
     return WatcherConfig(
         token=token,
         repo=repo,
         poll_interval_seconds=poll_interval_seconds,
-        events_dir=events_dir,
-        prs_path=prs_path,
         review_concentration_path=review_concentration_path,
-        pr_reviews_path=pr_reviews_path,
+        supabase_url=supabase_url,
+        supabase_service_key=supabase_service_key,
     )
 
 

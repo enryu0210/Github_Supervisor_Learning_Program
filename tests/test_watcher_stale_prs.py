@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from watcher import stale_prs
@@ -10,10 +9,9 @@ def _config() -> WatcherConfig:
         token="secret-token",
         repo="owner/repo",
         poll_interval_seconds=300,
-        events_dir=Path("./events"),
-        prs_path=Path("./prs.json"),
         review_concentration_path=Path("./review_concentration.json"),
-        pr_reviews_path=Path("./pr_reviews.json"),
+        supabase_url="https://example.supabase.co",
+        supabase_service_key="service-key",
     )
 
 
@@ -111,22 +109,3 @@ def test_run_returns_empty_for_no_pulls(monkeypatch) -> None:
     monkeypatch.setattr(stale_prs.github_client, "list_all_pulls", lambda cfg: [])
 
     assert stale_prs.run(_config()) == []
-
-
-def test_write_snapshot_creates_parent_dir_and_writes_array(tmp_path) -> None:
-    path = tmp_path / "nested" / "prs.json"
-    records = [{"number": 1, "state": "open"}]
-
-    result = stale_prs.write_snapshot(records, path)
-
-    assert result == path
-    assert json.loads(path.read_text(encoding="utf-8")) == records
-
-
-def test_write_snapshot_overwrites_existing_file(tmp_path) -> None:
-    path = tmp_path / "prs.json"
-    path.write_text(json.dumps([{"number": 1}]), encoding="utf-8")
-
-    stale_prs.write_snapshot([], path)
-
-    assert json.loads(path.read_text(encoding="utf-8")) == []

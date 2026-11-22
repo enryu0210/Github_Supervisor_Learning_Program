@@ -10,10 +10,9 @@ def _config() -> WatcherConfig:
         token="secret-token",
         repo="owner/repo",
         poll_interval_seconds=300,
-        events_dir=Path("./events"),
-        prs_path=Path("./prs.json"),
         review_concentration_path=Path("./review_concentration.json"),
-        pr_reviews_path=Path("./pr_reviews.json"),
+        supabase_url="https://example.supabase.co",
+        supabase_service_key="service-key",
     )
 
 

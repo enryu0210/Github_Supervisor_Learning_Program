@@ -11,11 +11,11 @@ def main() -> int:
     )
     try:
         config = load_config()
+        poller.run_forever(config)
     except WatcherConfigError as exc:
         logging.getLogger("watcher").error(str(exc))
         return 1
 
-    poller.run_forever(config)
     return 0
 
 

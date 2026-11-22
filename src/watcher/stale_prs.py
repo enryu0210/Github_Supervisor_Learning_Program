@@ -1,6 +1,3 @@
-import json
-from pathlib import Path
-
 from watcher import github_client
 from watcher.config import WatcherConfig
 
@@ -27,12 +24,3 @@ def run(config: WatcherConfig) -> list[dict]:
     return [
         to_pr_record(config.repo, pr) for pr in github_client.list_all_pulls(config)
     ]
-
-
-def write_snapshot(records: list[dict], path: Path) -> Path:
-    """`events.write_event`와 달리 건마다 파일을 쌓지 않는다. `prs`는
-    (repo, number) 기준 upsert 대상이라 매 폴링마다 전체 배열을 한 파일에 덮어써
-    DB 적재(10번 PR)가 그대로 batch upsert하면 되게 한다."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
-    return path

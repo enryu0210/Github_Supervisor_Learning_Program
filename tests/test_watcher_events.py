@@ -1,5 +1,3 @@
-import json
-
 from watcher import events
 
 
@@ -67,28 +65,3 @@ def test_make_detected_event_defaults_occurred_at_to_now() -> None:
     assert event.occurred_at is not None
     # 감지 시각 기본값이 살아있는지만 확인 — 정확한 현재 시각 비교는 불안정하다.
     assert "T" in event.occurred_at
-
-
-def test_write_event_creates_file_with_matching_content(tmp_path) -> None:
-    event = _make()
-    output_dir = tmp_path / "events"
-    path = events.write_event(event, output_dir)
-
-    assert path == output_dir / f"{event.id}.json"
-    saved = json.loads(path.read_text(encoding="utf-8"))
-    assert saved["id"] == event.id
-    assert saved["rule_id"] == "R05"
-    assert saved["explanation"] == "브랜치명 규칙 위반"
-
-
-def test_write_event_overwrites_same_file_for_same_event(tmp_path) -> None:
-    output_dir = tmp_path / "events"
-    first = _make(explanation="첫 감지")
-    second = _make(explanation="재감지")
-
-    events.write_event(first, output_dir)
-    path = events.write_event(second, output_dir)
-
-    assert len(list(output_dir.iterdir())) == 1
-    saved = json.loads(path.read_text(encoding="utf-8"))
-    assert saved["explanation"] == "재감지"
