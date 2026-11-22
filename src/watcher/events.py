@@ -1,8 +1,5 @@
-import json
 import uuid
-from dataclasses import asdict
 from datetime import datetime
-from pathlib import Path
 
 from gitcoach.models import Event
 
@@ -47,12 +44,3 @@ def make_detected_event(
         llm_used=False,
         related_event_id=None,
     )
-
-
-def write_event(event: Event, output_dir: Path) -> Path:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / f"{event.id}.json"
-    path.write_text(
-        json.dumps(asdict(event), ensure_ascii=False, indent=2), encoding="utf-8"
-    )
-    return path

@@ -44,7 +44,8 @@ def run(config: WatcherConfig) -> list[dict]:
 
 
 def write_snapshot(records: list[dict], path: Path) -> Path:
-    """prs 스냅샷(stale_prs.write_snapshot)과 같은 방식 — 매 폴링마다 전체를 덮어쓴다."""
+    """`prs`·`pr_reviews`와 달리 DB 테이블이 없어 매 폴링마다 전체를 JSON으로
+    덮어쓴다(watcher-load.md 1절 — 판정 기준값 D2 미정이라 숫자만 남긴다)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding="utf-8")
     return path
