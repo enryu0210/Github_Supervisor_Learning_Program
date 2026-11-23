@@ -277,9 +277,9 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 - 인증 토큰을 쓰고, 조회 주기는 수 분 단위로 잡아 API 한도를 피한다.
 - DB 준비 전(11/17 전)에는 같은 스키마의 JSON 파일로 출력한다. `source`는 `"github"`. `pr_reviews`도 동일 — 11/14 마이그레이션 전까지는 JSON으로 제공하고, 실제 DB 적재는 11/17~ 일정에 맞춘다(11/9 확정).
 - 11/17~부터 DB 적재는 **service key**로 하며, 이 키는 watcher 컨테이너에만 두고 CLI에는 전달하지 않는다. 적재 순서는 `events` 먼저 → `quizzes` 나중(퀴즈가 근거 이벤트를 가리키므로), `insert ... on conflict (id) do nothing`으로 중복 적재를 막는다(`docs/architecture/data-flow.md` 공통 규칙). `prs`·`pr_reviews`는 예외로 **upsert**다(`prs`는 `(repo_id, number)`, `pr_reviews`는 `review_id` 기준, `prs` 먼저 → `pr_reviews` 나중) — `do nothing`으로 넣으면 `state`·`last_activity_at`이 첫 값에 고정돼 방치 PR 판정이 틀어진다(D4, #44).
-- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만. (`GITCOACH_SYNC_URL`·`GITCOACH_SYNC_TOKEN`은 CLI `sync`가 Edge Function을 호출할 때만 쓰는 값이라 watcher 목록에는 없다 — watcher는 service key로 DB에 직접 쓰므로 Edge Function을 거치지 않는다, #45 확정)
+- 환경변수: `OLLAMA_URL`, `GITHUB_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`. 실제 값은 `.env`에만, 레포에는 `.env.example`만. (`GITCOACH_SYNC_URL`·`GITCOACH_SYNC_TOKEN`은 CLI `sync`가 Edge Function을 호출할 때만 쓰는 값이라 watcher 목록에는 없다 — watcher는 service key로 DB에 직접 쓰므로 Edge Function을 거치지 않는다, #45 확정). 퀴즈 생성(12번)에서 `OLLAMA_MODEL`(기본 `gemma4:e2b`)·`WATCHER_QUIZ_BATCH_SIZE`(기본 10) 추가
 - 일정: 11/10~12 GitHub API 조회 PoC와 push 감지 방법 검증 → 11/13~16 브랜치명·PR 대상·커밋 메시지 규칙 적용 → 11/17~19 방치 PR·리뷰 쏠림, JSON/DB 출력, Dockerfile.
-- **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다. CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
+- **퀴즈 생성·전송(11/24~26)은 watcher가 맡는다(11/9 확정, 남주 전달·동의).** DB에 쌓인 전체 이벤트(`source`: cli+github 모두)를 기준으로 오답·허용·감지 이벤트를 모아 Ollama로 퀴즈를 만들고 `quizzes`에 직접 쓴다(action 범위는 #116에서 `detected` 포함으로 확정, 5절 12번). CLI `gitcoach sync`는 이벤트 업로드만 하고 퀴즈 생성에는 관여하지 않는다. 이유: (1) 대시보드 퀴즈는 cli·github 전체 소스를 봐야 완전해짐, (2) watcher는 이미 DB·Ollama에 상시 연결되어 트리거가 안정적, (3) `sync` 스펙(3-7)은 이벤트 업로드로 고정되어 있어 퀴즈 페이로드를 얹으면 계약이 커짐.
 
 ### 5-1. PR 쪼개기 (1 PR = 1 목적, ~300줄, base는 upstream develop, 11/12 추가)
 
@@ -302,13 +302,22 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`; `prs`·`pr_reviews`는 예외로 upsert, `prs` 먼저 → `pr_reviews` 나중), JSON 출력에서 전환
 11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도)
 
-**추후 (11/24~26, 상세 설계는 착수 시점에)**
-12. `feature/watcher-quiz-generation` — DB 이벤트(오답·허용) 기준 Ollama 호출 → `quizzes` 적재
+**추후 (11/24~26)**
+12. `feature/watcher-quiz-generation` — DB 이벤트 기준 Ollama 호출 → `quizzes` 적재 (설계 확정, #116)
+    - **출제 근거**: `events`에서 `action in ('allowed', 'guide_stopped', 'detected')`만 본다(`rule_id` 제한 없음 — 지금은 이 세 action을 만드는 규칙이 R01~R06·R08뿐이라 결과는 같지만, 나중에 규칙이 늘어도 코드 변경이 필요 없다). `source` 제한도 없어 cli·github 이벤트를 모두 본다.
+    - **중복 방지**: `quizzes.id = uuid5(NAMESPACE, f"quiz\x1f{source_event_id}")`(#116 1번 A안, `watcher/events.py`의 `make_detected_event` uuid5 네임스페이스 패턴과 같은 방식) — 근거 이벤트 1건당 퀴즈는 최대 1개로 고정되고, 다시 넣어도 `on conflict (id) do nothing`이라 안전하다. 다만 매 폴링 틱마다 같은 이벤트로 Ollama를 또 호출하지 않으려면, 생성 전에 `quizzes.source_event_id`에 이미 있는 이벤트를 걸러낸다(anti-join, 이슈의 예시 쿼리 참고).
+    - **미등록 멤버**: `members.github_login`으로 못 찾은 이벤트는 퀴즈를 만들지 않고 경고 로그만 남긴다(#116 3번, `db_sink.upload_events`가 DB 제약에 안 맞는 멤버를 건너뛰는 것과 같은 패턴). 멤버가 나중에 등록되면 다음 폴링에서 자연히 만들어진다.
+    - **조회 방법**: watcher가 service key로 `events`·`members`·`quizzes`를 직접 읽는다(뷰 추가 없음, #116 4번).
+    - **배치 상한**: 한 폴링 틱에 최대 `WATCHER_QUIZ_BATCH_SIZE`건(기본 10)만 생성해, 폴링 주기(기본 300초) 안에 끝나도록 한다. 별도 타이머 없이 `poll_once()`의 한 단계로 둔다.
+    - **선택지**: 항상 4개(문자열), `answer_index`는 0~3 — 프롬프트에 명시하고 응답을 검증한다(`quizzes_choices_chk`는 2개 이상만 요구하지만 더 엄격하게 고정).
+    - **Ollama 실패·응답 형식 오류**: 규칙별 고정 폴백 문항 1개로 대체한다(`explain/templates.py`의 폴백 패턴과 동일). 아직 템플릿이 없는 규칙은 generic 기본 문항으로 떨어진다.
+    - `data-flow.md` ⑤의 "`allowed`·`guide_stopped` 기반" 문구도 `detected` 포함으로 함께 고친다(#116, DB 담당 요청).
 
 **리스크**
 - 7·8번은 D2가 11/17 전 확정되지 않으면 "이벤트화 없이 데이터만 생성"으로 범위를 좁혀 먼저 머지하고, 결정 나는 대로 후속 PR로 확장한다. (9번은 D4가 #44로 확정되어 더 이상 해당 없음)
 - 10번은 4~9번에서 다루는 이벤트 종류가 어느 정도 정해진 뒤에 붙인다(적재 순서·중복 방지 로직 재작업을 줄이기 위함).
 - DB 적재(11/17~)·Compose 통합(11/20~23)·퀴즈 생성(11/24~26)이 모두 이 PR들의 완료를 전제로 순차 진행되므로, CLI의 P2(13·14번)처럼 뒤로 미룰 여지가 없다. 유일하게 여유를 둘 수 있는 건 12번(퀴즈 생성)뿐이다.
+- R01·R05·R06은 CLI(`allowed`/`guide_stopped`)와 watcher(`detected`)가 같은 사건을 각자 따로 잡을 수 있어(6장 참고 결정 미정 항목) 같은 사건으로 퀴즈가 2건 생길 수 있다. 이번 PR 범위에서는 막지 않고, 통계 중복 집계 건과 함께 추후 판단한다.
 
 ## 6. 이벤트 스키마 v1 (내가 지키는 계약)
 ```json
@@ -362,7 +371,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 - `source`는 `cli` 또는 `github`. 두 경우 모두 같은 스키마.
 - v1은 11/5 확정 후 임지윤·이남주에게 통보했다. 이후 필드 추가·변경은 PR을 올리고 CLI·웹·DB 담당 3명이 모두 승인한다. ERD의 `events.action` 설명도 함께 바꾼다.
 - 시크릿 값은 어떤 필드에도 넣지 않는다.
-- 활용: 대시보드는 "위반 후 가이드를 끝까지 한 비율"을 학습 지표로, 퀴즈는 `allowed`·`guide_stopped`를 우선 출제 근거로 쓴다.
+- 활용: 대시보드는 "위반 후 가이드를 끝까지 한 비율"을 학습 지표로, 퀴즈는 `allowed`·`guide_stopped`·`detected`를 출제 근거로 쓴다(#116 확정, 5절 12번).
 - 이벤트 로컬 저장 위치는 레포별이 아니라 **사용자 전역** `~/.gitcoach/events.db`(`config.toml`과 동일한 위치, 11/10 확정, 이남주 확인 — DB 쪽 영향 없음). 학생이 git 사고로 레포를 지우고 다시 clone해도 이벤트 기록이 남도록 하기 위함.
 - **[참고, 11/17~19 임지윤과 정리]** R01·R05·R06은 CLI(`guided`/`allowed`)와 watcher(`detected`)가 같은 사건을 각자 따로 잡을 수 있어 위반 통계에 중복 집계될 수 있다. `source` 필터로 구분할지는 watcher 착수 때 정한다(이남주 지적).
 - 11/9 v1 고정, 11/10 id 공식(CLI=uuid4/watcher=uuid5 분리)·`command_summary` 복사·저장 위치·R03 다중위반 예외 보강(임지윤·이남주 확인 완료).

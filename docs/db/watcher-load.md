@@ -115,12 +115,27 @@ sb.table("pr_reviews").upsert(rows, on_conflict="review_id").execute()
 - 리뷰 `body`는 받지 않는다.
 - `pr_ids`에 없는 PR(이번 배치에서 `prs`를 적재하지 않은 PR)의 리뷰는 `prs`에서 `id`를 조회해 채운다.
 
-## 6. `quizzes` (11/24~)
+## 6. `quizzes` (11/24~, 설계 확정 #116)
 
-- `id`는 watcher가 만들고 `on conflict (id) do nothing`으로 넣는다.
-- `member_id`는 `members`에서 `github_login`으로 찾는다. `source_event_id`는 DB `events`에 이미 있는 이벤트만 가리킨다.
-- `choices`는 문자열 2개 이상인 JSON 배열, `answer_index`는 0부터 시작하고 배열 범위 안이어야 한다(`quizzes_choices_chk`).
-- 중복 방지 방식, 미등록 멤버 처리, 출제 근거 범위는 퀴즈 작업(11/24)에서 정한다.
+- **`id`**: watcher가 `uuid5(NAMESPACE, f"quiz\x1f{source_event_id}")`로 만들어 `on conflict (id) do nothing`으로 넣는다(#116 1번 A안). 근거 이벤트 1건당 퀴즈는 최대 1개로 고정되고, 같은 근거로 다시 넣어도 무시된다. "규칙당 상한"(예: 같은 사람이 R05를 10번 어기면 10문제가 쌓이는 것)은 이번 범위 밖 — 필요해지면 watcher 쪽에서 별도로 정한다.
+- **`member_id`**: `members`에서 `github_login`(소문자)으로 찾는다. 못 찾으면(아직 등록 안 된 멤버) 퀴즈를 만들지 않고 로그만 남긴다(#116 3번) — `quizzes.member_id`가 not null이라 저장 자체가 불가능하다.
+- **`source_event_id`**: DB `events`에 이미 있는 이벤트만 가리킨다. nullable이지만 watcher가 만드는 퀴즈는 항상 채운다.
+- **출제 근거 action**: `allowed` · `guide_stopped` · `detected`(#116 2번 — `guided`·`guide_completed`는 가이드로 바로잡힌 경우라 제외, `blocked`는 R03 미실행이라 제외). `01_cli.md` 6절 문구를 기준으로 하고 `data-flow.md` ⑤도 같이 맞췄다.
+- **조회 방법**: watcher가 service key로 `events`·`members`·`quizzes`를 직접 읽는다(뷰 추가 없음, #116 4번). 아직 퀴즈가 없는 근거 이벤트는 다음과 같이 고른다(이슈 #116 제안 쿼리):
+
+  ```sql
+  select e.id, e.member, e.rule_id, e.repo, e.occurred_at
+  from events e
+  join members m on m.github_login = e.member
+  where e.action in ('allowed', 'guide_stopped', 'detected')
+    and not exists (select 1 from quizzes q where q.source_event_id = e.id)
+  order by e.occurred_at desc
+  limit 50;
+  ```
+
+  `id`가 이미 결정론적(uuid5)이라 이 `not exists`가 없어도 중복 저장은 안 생기지만, 틱마다 같은 이벤트로 Ollama를 또 호출하는 걸 막으려면 생성 전에 걸러내는 편이 낫다.
+- `choices`는 문자열 2개 이상인 JSON 배열, `answer_index`는 0부터 시작하고 배열 범위 안이어야 한다(`quizzes_choices_chk`). watcher는 항상 4개로 생성한다(DB 제약보다 엄격하게 고정, 프롬프트 설계 쪽 결정).
+- 퀴즈 문구·선택지 생성(Ollama 프롬프트)·생성 주기(폴링 틱 안, 배치 상한)는 watcher 쪽 설계(`01_cli.md` 5-1절 12번)를 따른다.
 
 ## 7. 실패 처리
 
