@@ -300,7 +300,7 @@ GitHub API를 주기적으로 조회해 PR 밖의 행동까지 감지하고, CLI
 8. `feature/watcher-review-concentration` — 멤버별 리뷰 수 집계, 쏠림 알림. D2 미정이라 rule_id 없음(통계 집계 전용)
 9. `feature/watcher-pr-reviews`(`pr_reviews`) — `GET /repos/{owner}/{repo}/pulls/{number}/reviews` 수집(8번과 호출 재사용). D4 확정(#44, 3인 승인 완료) — 11/14 마이그레이션 전까지는 DB 적재 없이 JSON만 출력(일정상 제약, 승인 여부와 무관)
 10. `feature/watcher-db-sink` — service key로 DB 적재(`events` 먼저 → `quizzes`는 11/24~, `insert ... on conflict (id) do nothing`; `prs`·`pr_reviews`는 예외로 upsert, `prs` 먼저 → `pr_reviews` 나중), JSON 출력에서 전환
-11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도)
+11. `feature/watcher-dockerfile` — Dockerfile, Ollama 통신 확인(Compose 전체 통합은 11/20~23 장일호·임호일과 별도). Dockerfile은 PR #92(이슈 #86)로 완료. Ollama 통신 확인은 `OLLAMA_URL`(기본값 `http://localhost:11434`, docker-compose에서는 `http://ollama:11434`)로 `/api/tags`를 호출하는 코드 레벨 헬스체크(`src/watcher/ollama_health.py`)로 보강 — watcher 시작 시 1회만 확인하고 실패해도 기동은 막지 않는다(watcher는 아직 Ollama를 쓰지 않으므로). 모델 pull 확인·실제 퀴즈 호출은 12번 범위
 
 **추후 (11/24~26, 상세 설계는 착수 시점에)**
 12. `feature/watcher-quiz-generation` — DB 이벤트(오답·허용) 기준 Ollama 호출 → `quizzes` 적재
