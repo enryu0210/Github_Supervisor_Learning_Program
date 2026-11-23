@@ -12,6 +12,9 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 
+# watcher 런타임 출력
+review_concentration.json
+
 # Node / Next.js
 node_modules/
 .next/
