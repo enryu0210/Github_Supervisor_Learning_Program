@@ -74,8 +74,14 @@ def test_check_reports_failure_on_connect_error(monkeypatch) -> None:
 
 def test_check_reports_failure_on_malformed_payload(monkeypatch) -> None:
     # models 항목이 dict 가 아니거나 name 이 문자열이 아니어도 예외가 새지 않아야 한다.
-    for payload in ({"models": ["gemma4:e2b"]}, {"models": [{"name": 1}]}, {"models": 3}):
-        monkeypatch.setattr(httpx, "get", lambda url, *, timeout, p=payload: _FakeResponse(p))
+    for payload in (
+        {"models": ["gemma4:e2b"]},
+        {"models": [{"name": 1}]},
+        {"models": 3},
+    ):
+        monkeypatch.setattr(
+            httpx, "get", lambda url, *, timeout, p=payload: _FakeResponse(p)
+        )
         ok, _message = ollama_health.check(_config())
 
         assert ok is False
