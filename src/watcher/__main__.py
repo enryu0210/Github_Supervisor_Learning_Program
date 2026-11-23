@@ -19,7 +19,11 @@ def main() -> int:
     ok, message = ollama_health.check(config)
     (logger.info if ok else logger.warning)(message)
 
-    poller.run_forever(config)
+    try:
+        poller.run_forever(config)
+    except WatcherConfigError as exc:
+        logger.error(str(exc))
+        return 1
     return 0
 
 
