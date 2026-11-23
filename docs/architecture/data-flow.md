@@ -63,7 +63,7 @@ flowchart LR
 | ② | 업로드 | CLI `sync` → `ingest-events` → `events` | ①과 같은 이벤트 묶음 | 팀 토큰 (학생 PC에 서버 키 없음) | 권아현 · 이남주 | 11/17~18 |
 | ③ | 감지 | GitHub API → watcher | 브랜치 · PR · 커밋 · 리뷰 | `GITHUB_TOKEN` | 권아현 | 11/10 |
 | ④ | 감지 결과 적재 | watcher → `events`, `prs` | `detected` 이벤트, PR 상태 | service key | 권아현 · 이남주 | 11/17 (전까지 JSON 파일) |
-| ⑤ | 퀴즈 | `events`(DB) → watcher → ollama → `quizzes` | `allowed` · `guide_stopped` 기반 문제. 출제 근거는 **DB의 `events`**(`source` = `cli`·`github` 모두)에서 읽는다. CLI `sync`는 관여 안 함 (`01_cli.md` 2절 11/24~, 11/9 확정) | service key (읽기·쓰기 모두) | 권아현 · 이남주 | 11/24 |
+| ⑤ | 퀴즈 | `events`(DB) → watcher → ollama → `quizzes` | `allowed` · `guide_stopped` · `detected` 기반 문제(#116 확정). 출제 근거는 **DB의 `events`**(`source` = `cli`·`github` 모두)에서 읽는다. CLI `sync`는 관여 안 함 (`01_cli.md` 2절 11/24~, 11/9 확정, action 범위는 #116) | service key (읽기·쓰기 모두) | 권아현 · 이남주 | 11/24 |
 | ⑥ | 화면 | 뷰/RPC → dashboard `lib/data` | 집계 · 타임라인 · 방치 PR · 퀴즈 | anon key + 로그인 토큰, RLS | 임지윤 · 이남주 | 11/19~20 (전까지 mock) |
 
 ### 공통 규칙
