@@ -218,7 +218,13 @@ function ReviewBanner({ quizzes, events }: { quizzes: Awaited<ReturnType<typeof 
   // 가장 최근 문제의 근거 이벤트로 안내 문장을 만든다
   const latest = quizzes[0];
   const source = events.find((e) => e.id === latest.source_event_id);
-  const why = source?.action === "allowed" ? "그냥 실행한" : source?.action === "guide_stopped" ? "가이드를 중단한" : "최근";
+  // 퀴즈 근거는 allowed·guide_stopped·detected 세 가지 (#116 2번)
+  const WHY: Partial<Record<string, string>> = {
+    allowed: "그냥 실행한",
+    guide_stopped: "가이드를 중단한",
+    detected: "GitHub에서 발견된",
+  };
+  const why = (source && WHY[source.action]) ?? "최근";
   const sameRule = quizzes.filter((q) => q.rule_id === latest.rule_id).length;
   const name = RULE_NAMES[latest.rule_id];
 

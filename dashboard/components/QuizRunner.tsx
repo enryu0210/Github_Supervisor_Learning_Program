@@ -194,7 +194,7 @@ export default function QuizRunner({ items }: { items: QuizItem[] }) {
               <p className="text-sm text-muted">근거 기록을 찾지 못했어요.</p>
             )}
             <p className="mt-3 text-[11px] leading-relaxed text-muted">
-              경고를 보고도 그냥 실행했거나 가이드를 중간에 멈춘 기록으로 문제가 만들어져요.
+              경고를 보고도 그냥 실행했거나, 가이드를 중간에 멈췄거나, GitHub에서 위반이 발견된 기록으로 문제가 만들어져요.
             </p>
           </section>
           <section className="rounded-card bg-surface p-5 shadow-card">
