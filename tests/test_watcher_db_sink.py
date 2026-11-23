@@ -304,3 +304,32 @@ def test_upload_pr_reviews_raises_db_sink_error_on_lookup_api_error() -> None:
         db_sink.upload_pr_reviews(
             client, "repo-uuid", {}, [_review_record(pr_number=9)]
         )
+
+
+def test_upload_quizzes_skips_upload_when_no_rows() -> None:
+    client = _FakeClient({})
+
+    db_sink.upload_quizzes(client, [])
+
+    assert client.calls == []
+
+
+def test_upload_quizzes_upserts_rows_with_do_nothing_semantics() -> None:
+    client = _FakeClient({"quizzes": [None]})
+    rows = [{"id": "quiz-uuid", "rule_id": "R01"}]
+
+    db_sink.upload_quizzes(client, rows)
+
+    call = client.calls[0]
+    assert call["table"] == "quizzes"
+    assert call["op"] == "upsert"
+    assert call["on_conflict"] == "id"
+    assert call["ignore_duplicates"] is True
+    assert call["rows"] == rows
+
+
+def test_upload_quizzes_raises_db_sink_error_on_api_error() -> None:
+    client = _FakeClient({"quizzes": [APIError({"message": "boom"})]})
+
+    with pytest.raises(db_sink.DbSinkError):
+        db_sink.upload_quizzes(client, [{"id": "quiz-uuid"}])

@@ -13,6 +13,8 @@ def _clear_env(monkeypatch) -> None:
     monkeypatch.delenv(config.SUPABASE_URL_ENV, raising=False)
     monkeypatch.delenv(config.SUPABASE_SERVICE_KEY_ENV, raising=False)
     monkeypatch.delenv(config.OLLAMA_URL_ENV, raising=False)
+    monkeypatch.delenv(config.OLLAMA_MODEL_ENV, raising=False)
+    monkeypatch.delenv(config.QUIZ_BATCH_SIZE_ENV, raising=False)
 
 
 def _set_required_env(monkeypatch) -> None:
@@ -132,6 +134,52 @@ def test_load_config_reads_custom_review_concentration_path(monkeypatch) -> None
     assert cfg.review_concentration_path == Path(
         "/tmp/watcher-review-concentration.json"
     )
+
+
+def test_load_config_uses_default_ollama_model(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    cfg = config.load_config()
+    assert cfg.ollama_model == config.DEFAULT_OLLAMA_MODEL
+
+
+def test_load_config_reads_custom_ollama_model(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv(config.OLLAMA_MODEL_ENV, "llama3:8b")
+    cfg = config.load_config()
+    assert cfg.ollama_model == "llama3:8b"
+
+
+def test_load_config_uses_default_quiz_batch_size(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    cfg = config.load_config()
+    assert cfg.quiz_batch_size == config.DEFAULT_QUIZ_BATCH_SIZE
+
+
+def test_load_config_reads_custom_quiz_batch_size(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv(config.QUIZ_BATCH_SIZE_ENV, "25")
+    cfg = config.load_config()
+    assert cfg.quiz_batch_size == 25
+
+
+def test_load_config_raises_on_non_integer_quiz_batch_size(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv(config.QUIZ_BATCH_SIZE_ENV, "soon")
+    with pytest.raises(config.WatcherConfigError):
+        config.load_config()
+
+
+def test_load_config_raises_on_non_positive_quiz_batch_size(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv(config.QUIZ_BATCH_SIZE_ENV, "0")
+    with pytest.raises(config.WatcherConfigError):
+        config.load_config()
 
 
 def test_load_config_uses_default_ollama_url(monkeypatch) -> None:

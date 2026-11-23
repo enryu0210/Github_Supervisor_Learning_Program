@@ -10,16 +10,24 @@ class OllamaError(Exception):
     pass
 
 
-def ask(messages: list[dict]) -> str:
+def ask(
+    messages: list[dict],
+    *,
+    url: str | None = None,
+    model: str | None = None,
+    num_predict: int = NUM_PREDICT,
+) -> str:
     settings = config.ollama_settings()
+    resolved_url = url or settings.url
+    resolved_model = model or settings.model
     try:
         response = httpx.post(
-            f"{settings.url}/api/chat",
+            f"{resolved_url}/api/chat",
             json={
-                "model": settings.model,
+                "model": resolved_model,
                 "messages": messages,
                 "stream": False,
-                "options": {"num_predict": NUM_PREDICT},
+                "options": {"num_predict": num_predict},
             },
             timeout=TIMEOUT,
         )
