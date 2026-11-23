@@ -9,9 +9,11 @@ POLL_INTERVAL_ENV = "WATCHER_POLL_INTERVAL_SECONDS"
 REVIEW_CONCENTRATION_PATH_ENV = "WATCHER_REVIEW_CONCENTRATION_PATH"
 SUPABASE_URL_ENV = "SUPABASE_URL"
 SUPABASE_SERVICE_KEY_ENV = "SUPABASE_SERVICE_KEY"
+OLLAMA_URL_ENV = "OLLAMA_URL"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
 DEFAULT_REVIEW_CONCENTRATION_PATH = "./review_concentration.json"
+DEFAULT_OLLAMA_URL = "http://localhost:11434"
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -28,6 +30,7 @@ class WatcherConfig:
     review_concentration_path: Path
     supabase_url: str
     supabase_service_key: str
+    ollama_url: str = DEFAULT_OLLAMA_URL
 
 
 def load_config() -> WatcherConfig:
@@ -57,6 +60,7 @@ def load_config() -> WatcherConfig:
         os.environ.get(REVIEW_CONCENTRATION_PATH_ENV)
         or DEFAULT_REVIEW_CONCENTRATION_PATH
     )
+    ollama_url = os.environ.get(OLLAMA_URL_ENV) or DEFAULT_OLLAMA_URL
 
     return WatcherConfig(
         token=token,
@@ -65,6 +69,7 @@ def load_config() -> WatcherConfig:
         review_concentration_path=review_concentration_path,
         supabase_url=supabase_url,
         supabase_service_key=supabase_service_key,
+        ollama_url=ollama_url,
     )
 
 

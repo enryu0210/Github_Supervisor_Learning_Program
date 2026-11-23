@@ -12,6 +12,7 @@ def _clear_env(monkeypatch) -> None:
     monkeypatch.delenv(config.REVIEW_CONCENTRATION_PATH_ENV, raising=False)
     monkeypatch.delenv(config.SUPABASE_URL_ENV, raising=False)
     monkeypatch.delenv(config.SUPABASE_SERVICE_KEY_ENV, raising=False)
+    monkeypatch.delenv(config.OLLAMA_URL_ENV, raising=False)
 
 
 def _set_required_env(monkeypatch) -> None:
@@ -131,3 +132,18 @@ def test_load_config_reads_custom_review_concentration_path(monkeypatch) -> None
     assert cfg.review_concentration_path == Path(
         "/tmp/watcher-review-concentration.json"
     )
+
+
+def test_load_config_uses_default_ollama_url(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    cfg = config.load_config()
+    assert cfg.ollama_url == config.DEFAULT_OLLAMA_URL
+
+
+def test_load_config_reads_custom_ollama_url(monkeypatch) -> None:
+    _clear_env(monkeypatch)
+    _set_required_env(monkeypatch)
+    monkeypatch.setenv(config.OLLAMA_URL_ENV, "http://ollama:11434")
+    cfg = config.load_config()
+    assert cfg.ollama_url == "http://ollama:11434"
