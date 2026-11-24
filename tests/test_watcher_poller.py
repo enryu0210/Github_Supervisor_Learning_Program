@@ -2,6 +2,8 @@ import json
 import logging
 from pathlib import Path
 
+from postgrest.exceptions import APIError
+
 from gitcoach.models import Event
 from watcher import db_sink, poller
 from watcher.config import WatcherConfig
@@ -182,6 +184,31 @@ def test_poll_once_continues_when_quiz_upload_fails(monkeypatch, caplog) -> None
         poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
 
     assert "quiz boom" in caplog.text
+
+
+def test_poll_once_continues_when_quiz_generation_raises_api_error(
+    monkeypatch, caplog
+) -> None:
+    """퀴즈 생성 중 Supabase APIError가 나도 그 틱의 나머지 단계(리뷰 쏠림·
+    prs·pr_reviews)는 계속 돌아야 한다(#133 리뷰 2번)."""
+    _stub_all(monkeypatch)
+
+    def raise_api_error(client, cfg):
+        raise APIError({"message": "quiz query boom"})
+
+    monkeypatch.setattr(poller.quiz_generation, "generate", raise_api_error)
+    prs_calls = []
+    monkeypatch.setattr(
+        poller.db_sink,
+        "upload_prs",
+        lambda client, repo_id, prs: prs_calls.append(prs) or {},
+    )
+
+    with caplog.at_level(logging.WARNING, logger="watcher"):
+        poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert "quiz query boom" in caplog.text
+    assert prs_calls == [[]]
 
 
 def test_poll_once_generates_quizzes_even_when_prs_upload_fails(monkeypatch) -> None:

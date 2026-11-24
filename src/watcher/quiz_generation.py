@@ -44,6 +44,10 @@ _SYSTEM_PROMPT = (
 
 _NUM_PREDICT = 400
 
+# gitcoach.explain.ollama.TIMEOUT(8초)는 CLI의 ~200토큰 설명용 값이라, 4지선다
+# JSON 400토큰을 CPU로 돌리면 부족할 수 있다(#133 리뷰). 퀴즈 생성만 따로 늘린다.
+_TIMEOUT = 30.0
+
 
 def quiz_id(source_event_id: str) -> str:
     return str(uuid.uuid5(_NAMESPACE, f"quiz\x1f{source_event_id}"))
@@ -156,7 +160,14 @@ def _parse_quiz(text: str) -> quiz_templates.QuizTemplate | None:
     return question, choices, answer_index, explanation
 
 
-def _generate_quiz(config: WatcherConfig, event: dict) -> quiz_templates.QuizTemplate:
+def _generate_quiz(
+    config: WatcherConfig, event: dict
+) -> quiz_templates.QuizTemplate | None:
+    """Ollama 응답이 형식에 안 맞으면 폴백 문항을 쓴다. 호출 자체가 실패(타임아웃
+    등)하면 폴백 대신 None을 돌려줘 이번 틱엔 저장하지 않는다 — id가 결정론적
+    이라 한 번 폴백으로 저장하면 나중에 Ollama가 정상화돼도 다시 생성되지
+    않기 때문이다(#133 리뷰 1번). 다음 틱에 같은 이벤트가 다시 후보로 잡혀
+    재시도된다."""
     messages = _build_messages(event)
     try:
         text = ollama.ask(
@@ -164,12 +175,13 @@ def _generate_quiz(config: WatcherConfig, event: dict) -> quiz_templates.QuizTem
             url=config.ollama_url,
             model=config.ollama_model,
             num_predict=_NUM_PREDICT,
+            timeout=_TIMEOUT,
         )
     except ollama.OllamaError as exc:
         logger.warning(
-            "Ollama 호출 실패, 폴백 문항 사용: rule=%s (%s)", event["rule_id"], exc
+            "Ollama 호출 실패, 다음 주기에 재시도: rule=%s (%s)", event["rule_id"], exc
         )
-        return quiz_templates.fallback(event["rule_id"])
+        return None
 
     parsed = _parse_quiz(text)
     if parsed is None:
@@ -197,7 +209,10 @@ def generate(client: Client, config: WatcherConfig) -> list[dict]:
             )
             continue
 
-        question, choices, answer_index, explanation = _generate_quiz(config, event)
+        generated = _generate_quiz(config, event)
+        if generated is None:
+            continue
+        question, choices, answer_index, explanation = generated
         rows.append(
             {
                 "id": quiz_id(event["id"]),

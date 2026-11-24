@@ -16,6 +16,7 @@ def ask(
     url: str | None = None,
     model: str | None = None,
     num_predict: int = NUM_PREDICT,
+    timeout: float = TIMEOUT,
 ) -> str:
     settings = config.ollama_settings()
     resolved_url = url or settings.url
@@ -29,7 +30,7 @@ def ask(
                 "stream": False,
                 "options": {"num_predict": num_predict},
             },
-            timeout=TIMEOUT,
+            timeout=timeout,
         )
         response.raise_for_status()
         # "message": null이면 .get(... , {})의 기본값은 안 쓰인다(키가 존재해서) —

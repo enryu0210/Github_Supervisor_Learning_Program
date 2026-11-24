@@ -1,5 +1,7 @@
-"""Ollama 실패·응답 형식 오류 시 쓰는 고정 폴백 문항(explain/templates.py의 폴백
-패턴과 동일). 선택지는 항상 4개다."""
+"""Ollama 응답이 퀴즈 형식에 안 맞을 때 쓰는 고정 폴백 문항(explain/templates.py의
+폴백 패턴과 동일). Ollama 호출 자체가 실패했을 땐 쓰지 않는다(#133 리뷰 1번) —
+quiz_generation._generate_quiz가 그 경우는 None을 돌려줘 재시도하게 한다.
+선택지는 항상 4개다."""
 
 QuizTemplate = tuple[
     str, list[str], int, str
@@ -9,12 +11,12 @@ _FALLBACKS: dict[str, QuizTemplate] = {
     "R01": (
         "main 브랜치에 직접 push하면 생길 수 있는 일은?",
         [
-            "리뷰·CI 없이 배포까지 이어질 수 있다",
             "push가 자동으로 PR로 바뀐다",
+            "리뷰·CI 없이 배포까지 이어질 수 있다",
             "로컬 커밋이 사라진다",
             "아무 일도 없다",
         ],
-        0,
+        1,
         "main은 팀이 공유하는 배포 브랜치라 리뷰·CI를 거쳐 PR로 들어가야 해요.",
     ),
     "R02": (
@@ -31,23 +33,23 @@ _FALLBACKS: dict[str, QuizTemplate] = {
     "R03": (
         ".env를 실수로 staged 했을 때 올바른 명령은?",
         [
-            "git restore --staged .env",
             "git commit --amend",
+            "git restore --staged .env",
             "git push --force",
             "git add .",
         ],
-        0,
+        1,
         "staged에서 빼고 .gitignore에 등록해요.",
     ),
     "R04": (
         "main에서 커밋해 버렸을 때 먼저 할 일은?",
         [
-            "feature 브랜치를 만들어 커밋을 옮긴다",
             "바로 push한다",
-            "레포를 지우고 다시 clone한다",
             "git clean -fd로 지운다",
+            "feature 브랜치를 만들어 커밋을 옮긴다",
+            "레포를 지우고 다시 clone한다",
         ],
-        0,
+        2,
         "feature 브랜치로 커밋을 옮긴 뒤 main을 원격 상태로 되돌려요.",
     ),
     "R05": (
@@ -73,12 +75,12 @@ _FALLBACKS: dict[str, QuizTemplate] = {
 _DEFAULT: QuizTemplate = (
     "이 상황에서 올바른 다음 행동은?",
     [
-        "규칙에 맞게 다시 시도한다",
         "그대로 둔다",
         "레포를 지운다",
+        "규칙에 맞게 다시 시도한다",
         "되돌릴 수 없는 명령을 쓴다",
     ],
-    0,
+    2,
     "규칙 도감에서 해당 규칙을 다시 확인해 보세요.",
 )
 

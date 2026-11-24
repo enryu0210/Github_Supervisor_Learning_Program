@@ -3,6 +3,8 @@ import logging
 import time
 from collections.abc import Callable
 
+from postgrest.exceptions import APIError
+
 from supabase import Client
 from watcher import (
     branch_naming,
@@ -30,7 +32,9 @@ def poll_once(config: WatcherConfig, client: Client, repo_id: str) -> None:
     upsert한다. 리뷰 쏠림 통계(멤버별 리뷰 수·비중, 판정 기준값은 D2 미정이라
     숫자만)는 DB 테이블이 없어 그대로 JSON 스냅샷으로 남긴다. `events`의 아직
     퀴즈가 없는 근거 이벤트는 Ollama로 퀴즈화해 `quizzes`에 넣는다(5-1절 12번,
-    #116) — prs 업로드 실패로 일찍 return해도 건너뛰지 않도록 그 앞에 둔다."""
+    #116) — prs 업로드 실패로 일찍 return해도 건너뛰지 않도록 그 앞에 둔다.
+    퀴즈 생성 중 Supabase APIError가 나도 prs·pr_reviews 단계를 건너뛰지 않도록
+    별도로 감싼다(#133 리뷰 2번)."""
     repo = github_client.get_repo(config)
     logger.info(
         "poll ok: %s (default_branch=%s)", config.repo, repo.get("default_branch")
@@ -50,14 +54,18 @@ def poll_once(config: WatcherConfig, client: Client, repo_id: str) -> None:
         else:
             logger.info("%d건의 detected 이벤트 업로드", len(violations))
 
-    quiz_rows = quiz_generation.generate(client, config)
-    if quiz_rows:
-        try:
-            db_sink.upload_quizzes(client, quiz_rows)
-        except db_sink.DbSinkError as exc:
-            logger.warning("quizzes 업로드 실패: %s", exc)
-        else:
-            logger.info("%d건의 퀴즈 생성", len(quiz_rows))
+    try:
+        quiz_rows = quiz_generation.generate(client, config)
+    except APIError as exc:
+        logger.warning("퀴즈 생성 실패, 이번 주기는 건너뜀: %s", exc)
+    else:
+        if quiz_rows:
+            try:
+                db_sink.upload_quizzes(client, quiz_rows)
+            except db_sink.DbSinkError as exc:
+                logger.warning("quizzes 업로드 실패: %s", exc)
+            else:
+                logger.info("%d건의 퀴즈 생성", len(quiz_rows))
 
     reviews = review_concentration.run(config)
     path = review_concentration.write_snapshot(

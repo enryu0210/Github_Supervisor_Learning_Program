@@ -262,7 +262,12 @@ def test_generate_builds_row_from_ollama_response(monkeypatch) -> None:
         }
     ]
     assert ask_calls == [
-        {"url": "http://localhost:11434", "model": "gemma4:e2b", "num_predict": 400}
+        {
+            "url": "http://localhost:11434",
+            "model": "gemma4:e2b",
+            "num_predict": 400,
+            "timeout": 30.0,
+        }
     ]
 
 
@@ -278,7 +283,9 @@ def test_generate_skips_event_when_member_not_registered(caplog) -> None:
     assert "unknown-user" in caplog.text
 
 
-def test_generate_falls_back_on_ollama_error(monkeypatch) -> None:
+def test_generate_skips_event_on_ollama_error(caplog, monkeypatch) -> None:
+    """호출 자체가 실패하면 폴백으로 영구 고정하지 않고 다음 주기에 다시
+    시도하도록 이번 틱엔 행을 만들지 않는다(#133 리뷰 1번)."""
     client = _FakeClient(
         {
             "events": [[_event(rule_id="R02")]],
@@ -292,13 +299,11 @@ def test_generate_falls_back_on_ollama_error(monkeypatch) -> None:
         lambda messages, **kw: (_ for _ in ()).throw(OllamaError("boom")),
     )
 
-    rows = quiz_generation.generate(client, _config())
+    with caplog.at_level(logging.WARNING, logger="watcher"):
+        rows = quiz_generation.generate(client, _config())
 
-    question, choices, answer_index, explanation = quiz_templates.fallback("R02")
-    assert rows[0]["question"] == question
-    assert rows[0]["choices"] == choices
-    assert rows[0]["answer_index"] == answer_index
-    assert rows[0]["explanation"] == explanation
+    assert rows == []
+    assert "재시도" in caplog.text
 
 
 def test_generate_falls_back_on_malformed_ollama_response(monkeypatch) -> None:
