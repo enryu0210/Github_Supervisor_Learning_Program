@@ -114,6 +114,19 @@ def upload_pr_reviews(
         raise DbSinkError(f"pr_reviews 업로드에 실패했어요: {exc}") from exc
 
 
+def upload_quizzes(client: Client, rows: list[dict]) -> None:
+    """`id`가 결정론적(uuid5)이라 `on conflict (id) do nothing`으로 넣는다
+    (watcher-load.md 6절, #116 1번)."""
+    if not rows:
+        return
+    try:
+        client.table("quizzes").upsert(
+            rows, on_conflict="id", ignore_duplicates=True
+        ).execute()
+    except APIError as exc:
+        raise DbSinkError(f"quizzes 업로드에 실패했어요: {exc}") from exc
+
+
 def _lookup_pr_id(client: Client, repo_id: str, number: int) -> str | None:
     try:
         res = (

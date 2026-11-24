@@ -2,6 +2,8 @@ import json
 import logging
 from pathlib import Path
 
+from postgrest.exceptions import APIError
+
 from gitcoach.models import Event
 from watcher import db_sink, poller
 from watcher.config import WatcherConfig
@@ -51,6 +53,8 @@ def _stub_all(monkeypatch) -> None:
     monkeypatch.setattr(poller.pr_base_detection, "run", lambda cfg: [])
     monkeypatch.setattr(poller.commit_message, "run", lambda cfg: [])
     monkeypatch.setattr(poller.db_sink, "upload_events", lambda client, events: None)
+    monkeypatch.setattr(poller.quiz_generation, "generate", lambda client, cfg: [])
+    monkeypatch.setattr(poller.db_sink, "upload_quizzes", lambda client, rows: None)
     monkeypatch.setattr(poller.review_concentration, "run", lambda cfg: [])
     monkeypatch.setattr(poller.stale_prs, "run", lambda cfg: [])
     monkeypatch.setattr(poller.db_sink, "upload_prs", lambda client, repo_id, prs: {})
@@ -133,6 +137,97 @@ def test_poll_once_continues_when_events_upload_fails(monkeypatch, caplog) -> No
 
     assert "boom" in caplog.text
     assert prs_calls == [[]]
+
+
+def test_poll_once_uploads_generated_quizzes(monkeypatch, caplog) -> None:
+    _stub_all(monkeypatch)
+    quiz_row = {"id": "quiz-uuid", "rule_id": "R01"}
+    monkeypatch.setattr(
+        poller.quiz_generation, "generate", lambda client, cfg: [quiz_row]
+    )
+    uploaded = []
+    monkeypatch.setattr(
+        poller.db_sink, "upload_quizzes", lambda client, rows: uploaded.extend(rows)
+    )
+
+    with caplog.at_level(logging.INFO, logger="watcher"):
+        poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert uploaded == [quiz_row]
+    assert "1건" in caplog.text
+
+
+def test_poll_once_skips_quiz_upload_when_no_quizzes_generated(monkeypatch) -> None:
+    _stub_all(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        poller.db_sink, "upload_quizzes", lambda client, rows: calls.append(rows)
+    )
+
+    poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert calls == []
+
+
+def test_poll_once_continues_when_quiz_upload_fails(monkeypatch, caplog) -> None:
+    _stub_all(monkeypatch)
+    monkeypatch.setattr(
+        poller.quiz_generation, "generate", lambda client, cfg: [{"id": "quiz-uuid"}]
+    )
+
+    def raise_db_error(client, rows):
+        raise db_sink.DbSinkError("quiz boom")
+
+    monkeypatch.setattr(poller.db_sink, "upload_quizzes", raise_db_error)
+
+    with caplog.at_level(logging.WARNING, logger="watcher"):
+        poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert "quiz boom" in caplog.text
+
+
+def test_poll_once_continues_when_quiz_generation_raises_api_error(
+    monkeypatch, caplog
+) -> None:
+    """퀴즈 생성 중 Supabase APIError가 나도 그 틱의 나머지 단계(리뷰 쏠림·
+    prs·pr_reviews)는 계속 돌아야 한다(#133 리뷰 2번)."""
+    _stub_all(monkeypatch)
+
+    def raise_api_error(client, cfg):
+        raise APIError({"message": "quiz query boom"})
+
+    monkeypatch.setattr(poller.quiz_generation, "generate", raise_api_error)
+    prs_calls = []
+    monkeypatch.setattr(
+        poller.db_sink,
+        "upload_prs",
+        lambda client, repo_id, prs: prs_calls.append(prs) or {},
+    )
+
+    with caplog.at_level(logging.WARNING, logger="watcher"):
+        poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert "quiz query boom" in caplog.text
+    assert prs_calls == [[]]
+
+
+def test_poll_once_generates_quizzes_even_when_prs_upload_fails(monkeypatch) -> None:
+    _stub_all(monkeypatch)
+    monkeypatch.setattr(
+        poller.db_sink,
+        "upload_prs",
+        lambda client, repo_id, prs: (_ for _ in ()).throw(db_sink.DbSinkError("x")),
+    )
+    quiz_calls = []
+    monkeypatch.setattr(
+        poller.quiz_generation,
+        "generate",
+        lambda client, cfg: quiz_calls.append(cfg) or [],
+    )
+
+    poller.poll_once(_config(), client=object(), repo_id=_REPO_ID)
+
+    assert len(quiz_calls) == 1
 
 
 def test_poll_once_uploads_prs_with_repo_id(monkeypatch) -> None:

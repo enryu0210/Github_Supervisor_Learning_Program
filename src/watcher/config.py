@@ -10,10 +10,14 @@ REVIEW_CONCENTRATION_PATH_ENV = "WATCHER_REVIEW_CONCENTRATION_PATH"
 SUPABASE_URL_ENV = "SUPABASE_URL"
 SUPABASE_SERVICE_KEY_ENV = "SUPABASE_SERVICE_KEY"
 OLLAMA_URL_ENV = "OLLAMA_URL"
+OLLAMA_MODEL_ENV = "OLLAMA_MODEL"
+QUIZ_BATCH_SIZE_ENV = "WATCHER_QUIZ_BATCH_SIZE"
 
 DEFAULT_POLL_INTERVAL_SECONDS = 300
 DEFAULT_REVIEW_CONCENTRATION_PATH = "./review_concentration.json"
 DEFAULT_OLLAMA_URL = "http://localhost:11434"
+DEFAULT_OLLAMA_MODEL = "gemma4:e2b"
+DEFAULT_QUIZ_BATCH_SIZE = 10
 
 _REPO_PATTERN = re.compile(r"^[^/\s]+/[^/\s]+$")
 
@@ -31,6 +35,8 @@ class WatcherConfig:
     supabase_url: str
     supabase_service_key: str
     ollama_url: str = DEFAULT_OLLAMA_URL
+    ollama_model: str = DEFAULT_OLLAMA_MODEL
+    quiz_batch_size: int = DEFAULT_QUIZ_BATCH_SIZE
 
 
 def load_config() -> WatcherConfig:
@@ -61,6 +67,8 @@ def load_config() -> WatcherConfig:
         or DEFAULT_REVIEW_CONCENTRATION_PATH
     )
     ollama_url = os.environ.get(OLLAMA_URL_ENV) or DEFAULT_OLLAMA_URL
+    ollama_model = os.environ.get(OLLAMA_MODEL_ENV) or DEFAULT_OLLAMA_MODEL
+    quiz_batch_size = _quiz_batch_size()
 
     return WatcherConfig(
         token=token,
@@ -70,6 +78,8 @@ def load_config() -> WatcherConfig:
         supabase_url=supabase_url,
         supabase_service_key=supabase_service_key,
         ollama_url=ollama_url,
+        ollama_model=ollama_model,
+        quiz_batch_size=quiz_batch_size,
     )
 
 
@@ -86,5 +96,22 @@ def _poll_interval() -> int:
     if value <= 0:
         raise WatcherConfigError(
             f"환경변수 {POLL_INTERVAL_ENV}는 0보다 커야 해요: {value}"
+        )
+    return value
+
+
+def _quiz_batch_size() -> int:
+    raw = os.environ.get(QUIZ_BATCH_SIZE_ENV)
+    if not raw:
+        return DEFAULT_QUIZ_BATCH_SIZE
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise WatcherConfigError(
+            f"환경변수 {QUIZ_BATCH_SIZE_ENV}는 정수여야 해요: {raw!r}"
+        ) from exc
+    if value <= 0:
+        raise WatcherConfigError(
+            f"환경변수 {QUIZ_BATCH_SIZE_ENV}는 0보다 커야 해요: {value}"
         )
     return value
