@@ -74,9 +74,13 @@ def _existing_quiz_ids(client: Client, ids: list[str]) -> set[str]:
 
 
 def _select_unquizzed(client: Client, config: WatcherConfig) -> list[dict]:
-    """아직 퀴즈가 없는 근거 이벤트만 고른다(#116 1번 — id가 결정론적이라 중복
-    저장은 안 생기지만, 틱마다 같은 이벤트로 Ollama를 또 호출하지 않으려면
-    생성 전에 걸러내는 편이 낫다)."""
+    """아직 퀴즈가 없는 근거 이벤트 중 members에 등록된 멤버의 이벤트만 고른다
+    (#116 1번 — id가 결정론적이라 중복 저장은 안 생기지만, 틱마다 같은 이벤트로
+    Ollama를 또 호출하지 않으려면 생성 전에 걸러내는 편이 낫다). 미등록 멤버
+    필터링은 batch_size로 슬라이싱하기 전에 해야 한다 — 뒤에서 하면 미등록
+    이벤트가 배치 슬롯을 차지해 실제로 퀴즈가 생성될 후보 수가 줄어든다(#135).
+    반환하는 각 이벤트 dict에는 "member_id"를 채워 넣어 generate()가 다시
+    조회하지 않게 한다."""
     candidates = _fetch_candidates(client, config)
     if not candidates:
         return []
@@ -85,18 +89,35 @@ def _select_unquizzed(client: Client, config: WatcherConfig) -> list[dict]:
     unquizzed = [
         event for event in candidates if quiz_ids_by_event[event["id"]] not in existing
     ]
-    return unquizzed[: config.quiz_batch_size]
+    if not unquizzed:
+        return []
+
+    member_ids = _resolve_member_ids(client, {event["member"] for event in unquizzed})
+    registered = []
+    for event in unquizzed:
+        member_id = member_ids.get(event["member"])
+        if member_id is None:
+            logger.warning(
+                "members에 없는 멤버라 퀴즈를 건너뜀: %s (%s)",
+                event["member"],
+                event["rule_id"],
+            )
+            continue
+        registered.append({**event, "member_id": member_id})
+
+    return registered[: config.quiz_batch_size]
 
 
-def _resolve_member_id(client: Client, github_login: str) -> str | None:
+def _resolve_member_ids(client: Client, github_logins: set[str]) -> dict[str, str]:
+    if not github_logins:
+        return {}
     res = (
         client.table("members")
-        .select("id")
-        .eq("github_login", github_login)
-        .limit(1)
+        .select("id, github_login")
+        .in_("github_login", list(github_logins))
         .execute()
     )
-    return res.data[0]["id"] if res.data else None
+    return {row["github_login"]: row["id"] for row in res.data or []}
 
 
 def _build_messages(event: dict) -> list[dict]:
@@ -200,15 +221,6 @@ def generate(client: Client, config: WatcherConfig) -> list[dict]:
     candidates = _select_unquizzed(client, config)
     rows = []
     for event in candidates:
-        member_id = _resolve_member_id(client, event["member"])
-        if member_id is None:
-            logger.warning(
-                "members에 없는 멤버라 퀴즈를 건너뜀: %s (%s)",
-                event["member"],
-                event["rule_id"],
-            )
-            continue
-
         generated = _generate_quiz(config, event)
         if generated is None:
             continue
@@ -216,7 +228,7 @@ def generate(client: Client, config: WatcherConfig) -> list[dict]:
         rows.append(
             {
                 "id": quiz_id(event["id"]),
-                "member_id": member_id,
+                "member_id": event["member_id"],
                 "rule_id": event["rule_id"],
                 "source_event_id": event["id"],
                 "question": question,

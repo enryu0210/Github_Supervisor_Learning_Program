@@ -128,7 +128,11 @@ def test_select_unquizzed_filters_out_events_with_existing_quiz() -> None:
     event_b = _event(event_id="event-2")
     existing_id = quiz_generation.quiz_id("event-1")
     client = _FakeClient(
-        {"events": [[event_a, event_b]], "quizzes": [[{"id": existing_id}]]}
+        {
+            "events": [[event_a, event_b]],
+            "quizzes": [[{"id": existing_id}]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
+        }
     )
 
     result = quiz_generation._select_unquizzed(client, _config())
@@ -143,15 +147,44 @@ def test_select_unquizzed_skips_quiz_lookup_when_no_candidates() -> None:
 
     assert result == []
     assert all(call["table"] != "quizzes" for call in client.calls)
+    assert all(call["table"] != "members" for call in client.calls)
 
 
 def test_select_unquizzed_respects_batch_size() -> None:
     events = [_event(event_id="event-1"), _event(event_id="event-2")]
-    client = _FakeClient({"events": [events], "quizzes": [[]]})
+    client = _FakeClient(
+        {
+            "events": [events],
+            "quizzes": [[]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
+        }
+    )
 
     result = quiz_generation._select_unquizzed(client, _config(quiz_batch_size=1))
 
     assert [e["id"] for e in result] == ["event-1"]
+
+
+def test_select_unquizzed_skips_unregistered_member_before_batch_slicing() -> None:
+    """미등록 멤버 이벤트가 배치 슬롯을 차지해 그 뒤의 등록된 멤버 이벤트가
+    밀려나면 안 된다(#135) — batch_size=1인데 1등 후보가 미등록이면, 등록된
+    2등 후보가 대신 뽑혀야 한다."""
+    events = [
+        _event(event_id="event-1", member="unknown-user"),
+        _event(event_id="event-2", member="hoil-lim"),
+    ]
+    client = _FakeClient(
+        {
+            "events": [events],
+            "quizzes": [[]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
+        }
+    )
+
+    result = quiz_generation._select_unquizzed(client, _config(quiz_batch_size=1))
+
+    assert [e["id"] for e in result] == ["event-2"]
+    assert result[0]["member_id"] == "member-uuid"
 
 
 def test_fetch_candidates_filters_by_repo_and_action() -> None:
@@ -237,7 +270,7 @@ def test_generate_builds_row_from_ollama_response(monkeypatch) -> None:
         {
             "events": [[_event()]],
             "quizzes": [[]],
-            "members": [[{"id": "member-uuid"}]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
         }
     )
     ask_calls = []
@@ -290,7 +323,7 @@ def test_generate_skips_event_on_ollama_error(caplog, monkeypatch) -> None:
         {
             "events": [[_event(rule_id="R02")]],
             "quizzes": [[]],
-            "members": [[{"id": "member-uuid"}]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
         }
     )
     monkeypatch.setattr(
@@ -311,7 +344,7 @@ def test_generate_falls_back_on_malformed_ollama_response(monkeypatch) -> None:
         {
             "events": [[_event(rule_id="R05")]],
             "quizzes": [[]],
-            "members": [[{"id": "member-uuid"}]],
+            "members": [[{"id": "member-uuid", "github_login": "hoil-lim"}]],
         }
     )
     monkeypatch.setattr(quiz_generation.ollama, "ask", lambda messages, **kw: "garbage")
