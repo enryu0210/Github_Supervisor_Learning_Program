@@ -149,8 +149,10 @@ def test_list_open_pulls_calls_pulls_endpoint_with_state_open(monkeypatch) -> No
     result = github_client.list_open_pulls(_config())
 
     assert calls == [
-        "https://api.github.com/repos/owner/repo/pulls"
-        "?state=open&sort=updated&direction=desc&per_page=100"
+        (
+            "https://api.github.com/repos/owner/repo/pulls"
+            "?state=open&sort=updated&direction=desc&per_page=100"
+        )
     ]
     assert result == [{"number": 1}]
 
@@ -166,8 +168,10 @@ def test_list_all_pulls_calls_pulls_endpoint_with_state_all(monkeypatch) -> None
     result = github_client.list_all_pulls(_config())
 
     assert calls == [
-        "https://api.github.com/repos/owner/repo/pulls"
-        "?state=all&sort=updated&direction=desc&per_page=100"
+        (
+            "https://api.github.com/repos/owner/repo/pulls"
+            "?state=all&sort=updated&direction=desc&per_page=100"
+        )
     ]
     assert result == [{"number": 1}]
 
@@ -189,8 +193,10 @@ def test_list_all_pulls_follows_link_header_pagination(monkeypatch) -> None:
     result = github_client.list_all_pulls(_config())
 
     assert calls == [
-        "https://api.github.com/repos/owner/repo/pulls"
-        "?state=all&sort=updated&direction=desc&per_page=100",
+        (
+            "https://api.github.com/repos/owner/repo/pulls"
+            "?state=all&sort=updated&direction=desc&per_page=100"
+        ),
         next_url,
     ]
     assert result == [{"number": 1}, {"number": 101}]
