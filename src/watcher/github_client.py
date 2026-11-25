@@ -82,11 +82,17 @@ def get_commit(config: WatcherConfig, sha: str) -> dict:
 
 
 def list_open_pulls(config: WatcherConfig) -> list[dict]:
-    return _paginate(config, f"/repos/{config.repo}/pulls?state=open&per_page=100")
+    return _paginate(
+        config,
+        f"/repos/{config.repo}/pulls?state=open&sort=updated&direction=desc&per_page=100",
+    )
 
 
 def list_all_pulls(config: WatcherConfig) -> list[dict]:
-    return _paginate(config, f"/repos/{config.repo}/pulls?state=all&per_page=100")
+    return _paginate(
+        config,
+        f"/repos/{config.repo}/pulls?state=all&sort=updated&direction=desc&per_page=100",
+    )
 
 
 def list_pull_commits(config: WatcherConfig, number: int) -> list[dict]:
