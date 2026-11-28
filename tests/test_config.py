@@ -114,6 +114,28 @@ def test_set_ollama_settings_timeout_roundtrip(tmp_path, monkeypatch) -> None:
     assert settings.model == "m1"
 
 
+def test_set_ollama_settings_rejects_non_positive_or_nan_timeout(
+    tmp_path, monkeypatch
+) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    for bad in (0.0, -5.0, float("nan"), float("inf")):
+        try:
+            config.set_ollama_settings(timeout=bad)
+            assert False, f"ValueError를 기대했지만 발생하지 않았어요: {bad}"
+        except ValueError:
+            pass
+
+
+def test_ollama_settings_falls_back_to_default_when_toml_timeout_invalid(
+    tmp_path, monkeypatch
+) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config.GLOBAL_CONFIG_PATH.write_text("[ollama]\ntimeout = 0")
+    assert config.ollama_settings().timeout == 20.0
+
+
 def test_disable_then_enable_rule_toggles(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     _init_repo(tmp_path)
