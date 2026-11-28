@@ -89,10 +89,14 @@ def list_open_pulls(config: WatcherConfig) -> list[dict]:
 
 
 def list_all_pulls(config: WatcherConfig) -> list[dict]:
-    return _paginate(
+    """`sort=updated`라 페이지를 받는 사이 PR이 갱신되면 순위가 바뀌어 같은 PR이
+    두 페이지에 걸쳐 중복으로 나올 수 있다(#140). `number` 기준으로 걸러 호출자
+    (stale_prs·pr_reviews·review_concentration) 모두에서 중복 upsert를 막는다."""
+    results = _paginate(
         config,
         f"/repos/{config.repo}/pulls?state=all&sort=updated&direction=desc&per_page=100",
     )
+    return list({pr["number"]: pr for pr in results}.values())
 
 
 def list_pull_commits(config: WatcherConfig, number: int) -> list[dict]:

@@ -202,6 +202,31 @@ def test_list_all_pulls_follows_link_header_pagination(monkeypatch) -> None:
     assert result == [{"number": 1}, {"number": 101}]
 
 
+def test_list_all_pulls_dedupes_pr_repeated_across_pages(monkeypatch) -> None:
+    """#140: sort=updated 중 PR이 갱신되면 페이지 사이에 같은 PR이 중복으로
+    나올 수 있다. number 기준으로 걸러 마지막에 받은 값만 남아야 한다."""
+    next_url = (
+        "https://api.github.com/repos/owner/repo/pulls"
+        "?state=all&sort=updated&direction=desc&per_page=100&page=2"
+    )
+
+    def fake_get(url, *, headers, timeout):
+        if url == next_url:
+            return _FakeResponse([{"number": 1, "title": "shifted-to-page2"}])
+        return _FakeResponse(
+            [{"number": 1, "title": "page1"}, {"number": 2, "title": "page1"}],
+            links={"next": {"url": next_url}},
+        )
+
+    monkeypatch.setattr(github_client._client, "get", fake_get)
+    result = github_client.list_all_pulls(_config())
+
+    assert result == [
+        {"number": 1, "title": "shifted-to-page2"},
+        {"number": 2, "title": "page1"},
+    ]
+
+
 def test_list_all_pulls_stops_when_no_next_link(monkeypatch) -> None:
     calls = []
 
