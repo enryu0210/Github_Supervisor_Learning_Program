@@ -44,8 +44,9 @@ _SYSTEM_PROMPT = (
 
 _NUM_PREDICT = 400
 
-# gitcoach.explain.ollama.TIMEOUT(8초)는 CLI의 ~200토큰 설명용 값이라, 4지선다
-# JSON 400토큰을 CPU로 돌리면 부족할 수 있다(#133 리뷰). 퀴즈 생성만 따로 늘린다.
+# CLI의 explain 기본 타임아웃(20초, gitcoach.config._DEFAULT_OLLAMA_TIMEOUT)은
+# ~200토큰 설명용 값이라, 4지선다 JSON 400토큰을 CPU로 돌리면 부족할 수 있다(#133 리뷰).
+# 퀴즈 생성만 따로 늘린다.
 _TIMEOUT = 30.0
 
 

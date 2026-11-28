@@ -65,6 +65,24 @@ def test_ollama_ask_uses_configured_url_and_model(tmp_path, monkeypatch) -> None
     assert calls == [("http://configured:9999/api/chat", "custom-model")]
 
 
+def test_ollama_ask_uses_configured_timeout_when_not_given(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr(config, "GLOBAL_CONFIG_PATH", tmp_path / "config.toml")
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.set_ollama_settings(timeout=45.0)
+
+    calls = []
+
+    def fake_post(url, *, json, timeout, **kwargs):
+        calls.append(timeout)
+        return _FakeResponse("설명입니다.")
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+    ollama.ask([{"role": "user", "content": "hi"}])
+    assert calls == [45.0]
+
+
 def test_ollama_ask_uses_custom_timeout_when_given(monkeypatch) -> None:
     calls = []
 

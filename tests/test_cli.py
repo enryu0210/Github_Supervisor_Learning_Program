@@ -77,6 +77,13 @@ def test_config_ollama_no_warning_without_env_var(tmp_path, monkeypatch) -> None
     assert "OLLAMA_URL" not in result.stdout
 
 
+def test_config_ollama_rejects_zero_timeout(tmp_path, monkeypatch) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["config", "ollama", "--timeout", "0"])
+    assert result.exit_code == 1
+    assert "timeout" in result.stdout
+
+
 def _outside_repo(monkeypatch) -> None:
     monkeypatch.setattr(config, "find_repo_root", lambda: None)
 

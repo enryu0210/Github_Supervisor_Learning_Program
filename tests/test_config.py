@@ -40,6 +40,7 @@ def test_ollama_settings_default_when_no_file(tmp_path, monkeypatch) -> None:
     settings = config.ollama_settings()
     assert settings.url == "http://localhost:11434"
     assert settings.model == "gemma4:e2b"
+    assert settings.timeout == 20.0
 
 
 # ---- 레포/전역 toml에서 읽기 ----
@@ -64,11 +65,12 @@ def test_ollama_settings_reads_global_toml(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("OLLAMA_URL", raising=False)
     config.GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     config.GLOBAL_CONFIG_PATH.write_text(
-        '[ollama]\nurl = "http://host:1234"\nmodel = "m"'
+        '[ollama]\nurl = "http://host:1234"\nmodel = "m"\ntimeout = 45'
     )
     settings = config.ollama_settings()
     assert settings.url == "http://host:1234"
     assert settings.model == "m"
+    assert settings.timeout == 45.0
 
 
 def test_ollama_url_env_var_overrides_config(tmp_path, monkeypatch) -> None:
@@ -99,6 +101,39 @@ def test_set_ollama_settings_updates_only_given_field(tmp_path, monkeypatch) -> 
     settings = config.ollama_settings()
     assert settings.url == "http://host:1234"
     assert settings.model == "m2"
+
+
+def test_set_ollama_settings_timeout_roundtrip(tmp_path, monkeypatch) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.set_ollama_settings(url="http://host:1234", model="m1")
+    config.set_ollama_settings(timeout=60.0)
+    settings = config.ollama_settings()
+    assert settings.timeout == 60.0
+    assert settings.url == "http://host:1234"
+    assert settings.model == "m1"
+
+
+def test_set_ollama_settings_rejects_non_positive_or_nan_timeout(
+    tmp_path, monkeypatch
+) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    for bad in (0.0, -5.0, float("nan"), float("inf")):
+        try:
+            config.set_ollama_settings(timeout=bad)
+            assert False, f"ValueError를 기대했지만 발생하지 않았어요: {bad}"
+        except ValueError:
+            pass
+
+
+def test_ollama_settings_falls_back_to_default_when_toml_timeout_invalid(
+    tmp_path, monkeypatch
+) -> None:
+    _use_tmp_global_config(tmp_path, monkeypatch)
+    monkeypatch.delenv("OLLAMA_URL", raising=False)
+    config.GLOBAL_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config.GLOBAL_CONFIG_PATH.write_text("[ollama]\ntimeout = 0")
+    assert config.ollama_settings().timeout == 20.0
 
 
 def test_disable_then_enable_rule_toggles(tmp_path, monkeypatch) -> None:

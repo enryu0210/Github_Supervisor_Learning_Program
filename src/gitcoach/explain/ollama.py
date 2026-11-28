@@ -2,7 +2,6 @@ import httpx
 
 from gitcoach import config
 
-TIMEOUT = 8.0
 NUM_PREDICT = 200
 
 
@@ -16,11 +15,12 @@ def ask(
     url: str | None = None,
     model: str | None = None,
     num_predict: int = NUM_PREDICT,
-    timeout: float = TIMEOUT,
+    timeout: float | None = None,
 ) -> str:
     settings = config.ollama_settings()
     resolved_url = url or settings.url
     resolved_model = model or settings.model
+    resolved_timeout = timeout if timeout is not None else settings.timeout
     try:
         response = httpx.post(
             f"{resolved_url}/api/chat",
@@ -30,7 +30,7 @@ def ask(
                 "stream": False,
                 "options": {"num_predict": num_predict},
             },
-            timeout=timeout,
+            timeout=resolved_timeout,
         )
         response.raise_for_status()
         # "message": null이면 .get(... , {})의 기본값은 안 쓰인다(키가 존재해서) —
