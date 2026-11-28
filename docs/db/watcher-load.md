@@ -28,7 +28,9 @@ sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"
 
 res = sb.table("repos").select("id").eq("full_name", config.repo).limit(1).execute()
 if not res.data:
-    raise WatcherConfigError(f"repos에 {config.repo}가 없어요. DB 담당에게 seed 등록을 요청하세요.")
+    raise WatcherConfigError(
+        f"repos에 {config.repo}가 없어요. DB 담당에게 seed 등록을 요청하세요."
+    )
 repo_id = res.data[0]["id"]
 ```
 
@@ -40,7 +42,7 @@ repo_id = res.data[0]["id"]
 ```python
 from dataclasses import asdict
 
-rows = [asdict(e) for e in violations]          # gitcoach.models.Event 15개 필드 = events 컬럼
+rows = [asdict(e) for e in violations]  # gitcoach.models.Event 15개 필드 = events 컬럼
 sb.table("events").upsert(rows, on_conflict="id", ignore_duplicates=True).execute()
 ```
 
@@ -69,16 +71,21 @@ def pr_row(pr: dict) -> dict:
         "number": pr["number"],
         "title": pr["title"],
         "author": pr["user"]["login"].lower(),
-        "state": pr["state"],                    # 'open' | 'closed' (머지된 PR도 closed)
+        "state": pr["state"],  # 'open' | 'closed' (머지된 PR도 closed)
         "opened_at": pr["created_at"],
-        "merged_at": pr["merged_at"],            # 머지 전이면 None — 키는 항상 넣는다
+        "merged_at": pr["merged_at"],  # 머지 전이면 None — 키는 항상 넣는다
         "reviewers": [r["login"].lower() for r in pr["requested_reviewers"]],
         "last_activity_at": pr["updated_at"],
     }
 
+
 # GET /repos/{owner}/{repo}/pulls?state=all&sort=updated&direction=desc&per_page=100 (페이지를 따라간다)
-res = sb.table("prs").upsert([pr_row(pr) for pr in pulls], on_conflict="repo_id,number").execute()
-pr_ids = {row["number"]: row["id"] for row in res.data}      # pr_reviews에서 쓴다
+res = (
+    sb.table("prs")
+    .upsert([pr_row(pr) for pr in pulls], on_conflict="repo_id,number")
+    .execute()
+)
+pr_ids = {row["number"]: row["id"] for row in res.data}  # pr_reviews에서 쓴다
 ```
 
 - **`state=all`로 닫힌·머지된 PR까지 보내야 한다.** `state=open`(#101의 `list_open_pulls`)만 쓰면 PR이 닫혀도 DB에는 `open`으로 남는다 → 방치 PR로 잘못 잡히고 `prs_merged`가 0이 된다. 2026-11-18 기준 우리 레포 PR 60건 중 열린 것은 1건이다.
@@ -95,12 +102,12 @@ pr_ids = {row["number"]: row["id"] for row in res.data}      # pr_reviews에서 
 # GET /repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100
 rows = [
     {
-        "review_id": rv["id"],                   # GitHub id, int 범위를 넘는다 (DB bigint)
+        "review_id": rv["id"],  # GitHub id, int 범위를 넘는다 (DB bigint)
         "pr_id": pr_ids[number],
         "reviewer": rv["user"]["login"].lower(),
-        "status": rv["state"],                   # APPROVED | CHANGES_REQUESTED | COMMENTED | DISMISSED
+        "status": rv["state"],  # APPROVED | CHANGES_REQUESTED | COMMENTED | DISMISSED
         "submitted_at": rv["submitted_at"],
-        "commit_sha": rv["commit_id"],           # 40자 소문자 hex
+        "commit_sha": rv["commit_id"],  # 40자 소문자 hex
         "html_url": rv["html_url"],
     }
     for number, rv in reviews
