@@ -188,7 +188,7 @@ git-coach/
 | rules | `check_xxx(cmd, ctx) -> Violation \| None` | 순수 함수, I/O 금지 |
 | rules | `evaluate(cmd, ctx) -> list[Violation]` | 심각도 순 정렬(R03 우선). **화면에는 전부** 표시 |
 | guide | `start(violations) / on_command(argv) / advance() / hint() / done() / stop()` | 시나리오 진행 상태, 다중 위반 큐 |
-| explain | `explain(v) -> Explanation` | 한국어 설명 + `llm_used`. 8초 초과·오류 시 템플릿 |
+| explain | `explain(v) -> Explanation` | 한국어 설명 + `llm_used`. 타임아웃(기본 20초, 설정 가능) 초과·오류 시 템플릿 |
 | events | `record(event)` | 로컬 SQLite에 저장 |
 
 ### 3-6. 핵심 설계 결정

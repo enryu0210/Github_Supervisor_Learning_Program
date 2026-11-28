@@ -9,7 +9,7 @@ SYNC_URL_ENV = "GITCOACH_SYNC_URL"
 SYNC_TOKEN_ENV = "GITCOACH_SYNC_TOKEN"
 
 BATCH_SIZE = 100
-TIMEOUT = 15.0  # 원격 네트워크 호출이라 Ollama(로컬, 8초)보다 여유를 둔다
+TIMEOUT = 15.0  # 원격 네트워크 호출용. Ollama explain 타임아웃(기본 20초)과는 별개
 
 
 class SyncError(Exception):
