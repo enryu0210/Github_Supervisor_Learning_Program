@@ -96,6 +96,7 @@ def config_show(ctx: typer.Context) -> None:
     settings = config.ollama_settings()
     typer.echo(f"ollama.url = {settings.url}")
     typer.echo(f"ollama.model = {settings.model}")
+    typer.echo(f"ollama.timeout = {settings.timeout}")
     _warn_if_ollama_url_overridden()
 
 
@@ -136,15 +137,17 @@ def config_enable_rule(rule_id: str) -> None:
 def config_ollama(
     url: str = typer.Option(None, "--url"),
     model: str = typer.Option(None, "--model"),
+    timeout: float = typer.Option(None, "--timeout"),
 ) -> None:
-    if url is None and model is None:
+    if url is None and model is None and timeout is None:
         settings = config.ollama_settings()
         typer.echo(f"url = {settings.url}")
         typer.echo(f"model = {settings.model}")
+        typer.echo(f"timeout = {settings.timeout}")
         _warn_if_ollama_url_overridden()
         return
     try:
-        config.set_ollama_settings(url=url, model=model)
+        config.set_ollama_settings(url=url, model=model, timeout=timeout)
     except ValueError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
