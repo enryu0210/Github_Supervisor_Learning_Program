@@ -28,6 +28,7 @@ class Context:
 class OllamaSettings:
     url: str
     model: str
+    timeout: float
 
 
 @dataclass

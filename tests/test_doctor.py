@@ -40,7 +40,7 @@ def test_check_ollama_model_found(monkeypatch) -> None:
     monkeypatch.setattr(
         doctor.config,
         "ollama_settings",
-        lambda: OllamaSettings(url="http://x", model="gemma4:e2b"),
+        lambda: OllamaSettings(url="http://x", model="gemma4:e2b", timeout=20.0),
     )
     monkeypatch.setattr(
         doctor.httpx,
@@ -56,7 +56,7 @@ def test_check_ollama_model_not_pulled(monkeypatch) -> None:
     monkeypatch.setattr(
         doctor.config,
         "ollama_settings",
-        lambda: OllamaSettings(url="http://x", model="gemma4:e2b"),
+        lambda: OllamaSettings(url="http://x", model="gemma4:e2b", timeout=20.0),
     )
     monkeypatch.setattr(
         doctor.httpx,
@@ -72,7 +72,7 @@ def test_check_ollama_connection_error(monkeypatch) -> None:
     monkeypatch.setattr(
         doctor.config,
         "ollama_settings",
-        lambda: OllamaSettings(url="http://x", model="m"),
+        lambda: OllamaSettings(url="http://x", model="m", timeout=20.0),
     )
 
     def raise_connect_error(url, timeout):
@@ -88,7 +88,7 @@ def test_check_ollama_invalid_json(monkeypatch) -> None:
     monkeypatch.setattr(
         doctor.config,
         "ollama_settings",
-        lambda: OllamaSettings(url="http://x", model="m"),
+        lambda: OllamaSettings(url="http://x", model="m", timeout=20.0),
     )
 
     class _BadJsonResponse(_FakeResponse):

@@ -14,6 +14,10 @@ _UNRESOLVED = object()
 
 _DEFAULT_OLLAMA_URL = "http://localhost:11434"
 _DEFAULT_OLLAMA_MODEL = "gemma4:e2b"
+# CPU로 실제 추론(200토큰)을 돌리면 8초를 넘기는 경우가 흔해(#139 패키징 테스트,
+# watcher 퀴즈 생성 PR #133 리뷰에서도 같은 이유로 자체 타임아웃을 30초로 올림)
+# 기본값을 20초로 올리고, 기기별로 느리면 설정으로 더 늘릴 수 있게 한다.
+_DEFAULT_OLLAMA_TIMEOUT = 20.0
 
 
 def find_repo_root() -> Path | None:
@@ -67,6 +71,12 @@ def _as_str_list(value: object, default: list[str]) -> list[str]:
 def _as_str(value: object, default: str | None) -> str | None:
     if isinstance(value, str):
         return value
+    return default
+
+
+def _as_float(value: object, default: float) -> float:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
     return default
 
 
@@ -211,11 +221,14 @@ def ollama_settings() -> OllamaSettings:
         ollama.get("url"), _DEFAULT_OLLAMA_URL
     )
     model = _as_str(ollama.get("model"), _DEFAULT_OLLAMA_MODEL)
-    return OllamaSettings(url=url, model=model)
+    timeout = _as_float(ollama.get("timeout"), _DEFAULT_OLLAMA_TIMEOUT)
+    return OllamaSettings(url=url, model=model, timeout=timeout)
 
 
-def set_ollama_settings(*, url: str | None = None, model: str | None = None) -> None:
-    if url is None and model is None:
+def set_ollama_settings(
+    *, url: str | None = None, model: str | None = None, timeout: float | None = None
+) -> None:
+    if url is None and model is None and timeout is None:
         return
     data = _load_toml(GLOBAL_CONFIG_PATH, strict=True)
     ollama = data.get("ollama")
@@ -224,5 +237,7 @@ def set_ollama_settings(*, url: str | None = None, model: str | None = None) -> 
         ollama["url"] = url
     if model is not None:
         ollama["model"] = model
+    if timeout is not None:
+        ollama["timeout"] = timeout
     data["ollama"] = ollama
     _write_toml(GLOBAL_CONFIG_PATH, data)
